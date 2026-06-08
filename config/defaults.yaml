@@ -1,4 +1,4 @@
-# Framework defaults — UNIVERSAL config shared by every instance/example.
+# Framework defaults — UNIVERSAL config shared by all deployments.
 #
 # These values are merged UNDER the active instance config
 # (<instance>/config/environments.yaml) by evaluation/utils.load_config().

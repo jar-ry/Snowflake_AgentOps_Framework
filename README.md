@@ -1,8 +1,16 @@
 # Snowflake AgentOps Framework
 
-An end-to-end framework for developing, testing, and promoting **Semantic Views** and **Cortex Agents** in Snowflake with CI/CD-driven governance.
+A governance framework for **Semantic Views** and **Cortex Agents** in Snowflake. Clone this repo, point it at your existing agents, and get CI/CD quality gates, automated monitoring, and an App Runtime dashboard — without rebuilding your environment.
 
-Built for data teams who want to **self-serve semantic view development** while maintaining production-grade quality gates.
+---
+
+## What This Does
+
+1. **Discovers** your existing semantic views and agents
+2. **Evaluates** them with question banks + LLM-as-a-judge
+3. **Monitors** accuracy, cost, latency, and interaction quality over time
+4. **Gates** promotions via CI/CD pipelines (any CI system)
+5. **Alerts** on regressions, feedback spikes, and cost anomalies
 
 ---
 
@@ -13,8 +21,8 @@ Built for data teams who want to **self-serve semantic view development** while 
 │                        DEVELOPMENT WORKFLOW                         │
 │                                                                     │
 │  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────────┐  │
-│  │ Snowsight │    │  CoCo /  │    │   Git    │    │   GitHub     │  │
-│  │  (Edit)   │───▶│  IDE     │───▶│ Commit   │───▶│   Actions    │  │
+│  │ Snowsight │    │  CoCo /  │    │   Git    │    │    CI/CD     │  │
+│  │  (Edit)   │───▶│  IDE     │───▶│ Commit   │───▶│  Pipeline    │  │
 │  └──────────┘    └──────────┘    └──────────┘    └──────┬───────┘  │
 │                                                          │          │
 │                                                          ▼          │
@@ -22,49 +30,26 @@ Built for data teams who want to **self-serve semantic view development** while 
 │  │                    CI PIPELINE (on PR)                        │   │
 │  │                                                               │   │
 │  │  ┌─────────────────────────────────────────────────────────┐  │   │
-│  │  │ LAYER 1: AUDITS (structural quality gate)               │  │   │
-│  │  │                                                         │  │   │
-│  │  │  Semantic View Audit:                                   │  │   │
-│  │  │  ├─ Documentation (descriptions, comments)              │  │   │
-│  │  │  ├─ Naming conventions (casing, special chars)          │  │   │
-│  │  │  ├─ Metadata completeness (VALUES, types)               │  │   │
-│  │  │  ├─ Relationships (coverage, validity)                  │  │   │
-│  │  │  ├─ Inconsistencies (conflicting definitions)           │  │   │
-│  │  │  └─ Duplicates (redundant descriptions)                 │  │   │
-│  │  │                                                         │  │   │
-│  │  │  Agent Native Evaluation (EXECUTE_AI_EVALUATION):       │  │   │
-│  │  │  ├─ answer_correctness (semantic match)                 │  │   │
-│  │  │  ├─ logical_consistency (reasoning coherence)           │  │   │
-│  │  │  └─ safety (custom LLM-judged metric)                   │  │   │
+│  │  │ LAYER 1: AUDITS (structural — free, no LLM calls)      │  │   │
+│  │  │  ├─ Documentation completeness                         │  │   │
+│  │  │  ├─ Naming conventions                                 │  │   │
+│  │  │  ├─ Metadata (VALUES, types)                           │  │   │
+│  │  │  ├─ Relationships                                      │  │   │
+│  │  │  └─ Inconsistencies / duplicates                       │  │   │
 │  │  └─────────────────────────────────────────────────────────┘  │   │
 │  │                              │                                 │   │
 │  │                              ▼                                 │   │
 │  │  ┌─────────────────────────────────────────────────────────┐  │   │
-│  │  │ LAYER 2: QUESTION BANK EVALUATION (accuracy gate)       │  │   │
-│  │  │                                                         │  │   │
-│  │  │  Semantic View:                                         │  │   │
-│  │  │  ┌────────┐  ┌──────────┐  ┌───────────┐               │  │   │
-│  │  │  │  Easy  │  │   Hard   │  │ Ambiguous │               │  │   │
-│  │  │  └────────┘  └──────────┘  └───────────┘               │  │   │
-│  │  │                                                         │  │   │
-│  │  │  Agent (Native GPA via EXECUTE_AI_EVALUATION):          │  │   │
-│  │  │  ┌────────────┐  ┌─────────────┐  ┌─────────────┐      │  │   │
-│  │  │  │ Answerable │  │Out of Scope │  │ Adversarial │      │  │   │
-│  │  │  └────────────┘  └─────────────┘  └─────────────┘      │  │   │
+│  │  │ LAYER 2: QUESTION BANK EVALUATION (LLM-judged accuracy) │  │   │
+│  │  │  ├─ Semantic View: easy / hard / ambiguous              │  │   │
+│  │  │  └─ Agent (GPA): answerable / OOS / adversarial         │  │   │
 │  │  └─────────────────────────────────────────────────────────┘  │   │
 │  │                                                               │   │
-│  │  Post combined results to PR comment                          │   │
+│  │  Post results to PR comment → accuracy >= threshold?          │   │
 │  └──────────────────────────────────────────────────────────────┘   │
 │                              │                                      │
-│                    accuracy >= threshold?                            │
-│                         │          │                                 │
-│                        YES        NO ──▶ Block merge, iterate       │
-│                         │                                           │
-│                         ▼                                           │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │                    CD PIPELINE (on merge)                     │   │
-│  │  Audit gate ──▶ Final eval ──▶ Deploy to PROD ──▶ Log       │   │
-│  └──────────────────────────────────────────────────────────────┘   │
+│                    YES → merge → CD deploys to PROD                 │
+│                    NO  → block merge, iterate                       │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -76,10 +61,11 @@ Built for data teams who want to **self-serve semantic view development** while 
 
 - Python 3.11+
 - A Snowflake account with Cortex AI features enabled
-- A named connection in `~/.snowflake/connections.toml` (or env vars `SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER`, `SNOWFLAKE_PASSWORD`)
-- [Cortex Code](https://docs.snowflake.com/en/user-guide/cortex-code) (recommended for guided setup)
+- Existing semantic views and/or agents you want to govern
+- A named connection in `~/.snowflake/connections.toml`
+- [Cortex Code](https://docs.snowflake.com/en/user-guide/cortex-code) (recommended)
 
-### Setup with Cortex Code (Recommended)
+### Bootstrap with Cortex Code (Recommended)
 
 Open this repo in Cortex Code and invoke the bootstrap skill:
 
@@ -87,11 +73,11 @@ Open this repo in Cortex Code and invoke the bootstrap skill:
 /bootstrap-from-existing
 ```
 
-The skill will interactively:
-1. Discover your existing semantic views and agents
+The skill will:
+1. Discover your existing semantic views and agents (`SHOW SEMANTIC VIEWS/AGENTS IN ACCOUNT`)
 2. Let you select which to bring under governance
 3. Ask for a database + schema to store framework tables
-4. Generate your `instance/config/environments.yaml`
+4. Generate `config/environments.yaml`
 5. Execute the setup SQL to create framework objects
 
 ### Manual Setup
@@ -103,16 +89,25 @@ pip install -r requirements.txt
 
 2. Copy config templates:
 ```bash
-cd instance/config
-cp environments.yaml.template environments.yaml
-cp thresholds.yaml.template thresholds.yaml
-cp monitoring.yaml.template monitoring.yaml
-cp schedules.yaml.template schedules.yaml
+cp config/environments.yaml.template config/environments.yaml
+cp config/thresholds.yaml.template config/thresholds.yaml
+cp config/monitoring.yaml.template config/monitoring.yaml
 ```
 
-3. Edit `instance/config/environments.yaml` — replace all `{{TOKEN}}` placeholders with your values.
+3. Edit `config/environments.yaml` — fill in your semantic view FQNs, agent FQNs, and framework DB/schema.
 
-4. Execute each SQL script in `setup/` against your Snowflake account (in order: 01, 04, 05, 07, 08, 09, 10, 11), substituting the tokens with your config values.
+4. Execute the setup SQL:
+```bash
+# Replace placeholders and run against your Snowflake account
+# The bootstrap skill does this automatically — or run manually:
+python -c "
+sql = open('setup/00_framework_tables.sql').read()
+sql = sql.replace('{{FRAMEWORK_DB}}', 'YOUR_DB')
+sql = sql.replace('{{FRAMEWORK_SCHEMA}}', 'AGENTOPS')
+sql = sql.replace('{{WAREHOUSE}}', 'YOUR_WH')
+# Execute each statement...
+"
+```
 
 5. Create question banks in `question_banks/` and run your first evaluation.
 
@@ -154,7 +149,7 @@ Snowflake_AgentOps_Framework/
 │   ├── llm_judge.py                   # LLM-as-a-Judge
 │   ├── discover_account.py            # Account discovery
 │   ├── generate_question_bank.py      # Starter question-bank generator
-│   ├── health_check.py               # Health checks (7 checks)
+│   ├── health_check.py               # Health checks
 │   ├── cost_reconcile.py             # Reconcile estimated vs actual credits
 │   ├── adversarial_library.yaml       # Curated adversarial patterns
 │   └── utils.py                       # Config loader + Snowflake helpers
@@ -176,138 +171,43 @@ Snowflake_AgentOps_Framework/
 
 ---
 
-## Evaluation Pipeline (Two Layers)
-
-### Layer 1: Audits (Structural Quality)
-
-**Semantic View Best Practices Audit** (`audit_semantic_view.py`):
-
-| Check | Description | Severity |
-|-------|-------------|----------|
-| Documentation | All tables/columns have descriptions | WARNING |
-| Naming | No special characters, consistent casing | WARNING/INFO |
-| Metadata | VALUES on categorical columns, data types | WARNING |
-| Relationships | Sufficient coverage for table count | ERROR/WARNING |
-| Inconsistencies | Conflicting metric/filter definitions | CRITICAL/HIGH |
-| Duplicates | Redundant descriptions across columns | MEDIUM |
-
-**Agent Native Evaluation (GPA Framework)** (`audit_agent.py`):
-
-| Metric | Type | Description |
-|--------|------|-------------|
-| `answer_correctness` | Built-in | Semantic match against ground truth |
-| `logical_consistency` | Built-in | Internal reasoning coherence |
-| `safety` | Custom LLM-judged | Scope/boundary compliance |
-| `groundedness` | Custom LLM-judged | Claims supported by tool outputs |
-| `execution_efficiency` | Custom LLM-judged | Optimal tool selection |
-| `answer_relevance` | Custom LLM-judged | Response addresses the question |
-| `conciseness` | Custom LLM-judged | No unnecessary verbosity |
-| `pii_leakage` | Custom LLM-judged | No PII exposed |
-
-### Layer 2: Question Bank Evaluation (Accuracy)
-
-**Semantic View** (`evaluate_semantic_view.py`):
-
-| Category | Evaluation Method | Threshold (PROD) |
-|----------|-------------------|-------------------|
-| Easy | SQL result comparison + LLM judge | 95% |
-| Hard | SQL result comparison + LLM judge | 75% |
-| Ambiguous | LLM-as-a-Judge only | 60% |
-
-**Agent** (native GPA evaluation):
-
-| Category | Focus |
-|----------|-------|
-| Answerable | Data queries + correctness |
-| Out of Scope | Boundary testing |
-| Adversarial | Prompt injection, data exfiltration |
-
----
-
-## CI/CD Pipeline Flow
-
-### Semantic View (PR → Merge → PROD)
-
-```
-PR Opened (touching instance/semantic_views/)
-  │
-  ├── Job 1: Best Practices Audit
-  │   └── audit_semantic_view.py (structural checks)
-  │
-  └── Job 2: Question Bank Evaluation
-      ├── Deploy SV to DEV
-      ├── evaluate_semantic_view.py --environment dev
-      └── Post combined results as PR comment
-           │
-   Merge to main
-           │
-           ├── audit_semantic_view.py (gate: fail = block deploy)
-           ├── evaluate_semantic_view.py (gate: accuracy >= threshold)
-           └── Deploy to PROD
-```
-
-### Agent (PR → Merge → PROD)
-
-```
-PR Opened (touching instance/agents/)
-  │
-  └── Job 1: Native Snowflake GPA Evaluation
-      ├── Deploy agent to DEV
-      └── audit_agent.py (EXECUTE_AI_EVALUATION with GPA metrics)
-           │
-      Post results as PR comment
-           │
-   Merge to main
-           │
-           ├── audit_agent.py (native GPA eval gate)
-           └── Deploy to PROD
-```
-
----
-
 ## Run Evaluations Locally
 
 ```bash
-# SV best practices audit
-python evaluation/audit_semantic_view.py \
-  --environment dev \
-  --output sv_audit.json
-
-# SV question bank evaluation (~5 min)
-python evaluation/evaluate_semantic_view.py \
-  --environment dev \
-  --output sv_eval.json
-
-# Agent native GPA evaluation (~8 min)
-python evaluation/audit_agent.py \
-  --environment dev \
-  --output agent_eval.json
-
 # Discover agents and semantic views in your account
 python evaluation/discover_account.py --format json
 
+# SV best practices audit (free — no LLM calls)
+python evaluation/audit_semantic_view.py --environment dev --live --semantic-view DB.SCHEMA.MY_SV
+
+# SV question bank evaluation
+python evaluation/evaluate_semantic_view.py --environment dev
+
+# Agent native GPA evaluation
+python evaluation/audit_agent.py --environment dev
+
 # Generate a starter question bank from your semantic view
-python evaluation/generate_question_bank.py
+python evaluation/generate_question_bank.py --semantic-view-yaml path/to/sv.yaml
+
+# Health checks
+python evaluation/health_check.py --environment dev
 ```
 
 ---
 
 ## Monitoring & Observability
 
-The framework includes a full monitoring layer for long-term tracking of agent health, accuracy trends, user feedback, and cost.
+The framework creates tables, views, alerts, and tasks in your chosen schema (see `setup/00_framework_tables.sql`).
 
-### Automated Schedules
+### Automated Schedules (Snowflake Tasks)
 
 | Schedule | What |
 |----------|------|
 | Daily 02:00 UTC | Token usage & cost aggregation |
 | Daily 02:15 UTC | Feedback sentiment analysis |
 | Daily 02:30 UTC | Interaction quality scan |
-| Daily 06:00 UTC | Health checks |
-| Sunday 04:00 UTC | SV smoke test |
-| Sunday 05:00 UTC | Agent smoke test |
 
-### Alerts
+### Alerts (Snowflake Alerts)
 
 | Alert | Trigger |
 |-------|---------|
@@ -319,19 +219,32 @@ The framework includes a full monitoring layer for long-term tracking of agent h
 | Health Failure | Any UNHEALTHY check |
 | Interaction Quality | >20% flagged or CRITICAL |
 
-### Monitoring Dashboard
+### Monitoring Dashboard (App Runtime)
 
-Deploy the Streamlit in Snowflake dashboard:
+Deploy the Next.js dashboard to Snowflake:
 
 ```bash
-cd monitoring && snow streamlit deploy --replace
+cd app && snow app setup --app-name="agentops-monitoring" && snow app deploy
 ```
+
+The dashboard shows: KPIs, accuracy trends, interaction quality flags, token costs, and active alerts — all filterable by agent.
+
+---
+
+## CI/CD Pipeline
+
+See [ci/README.md](ci/README.md) for full documentation on pipeline stages and how to wire them into GitHub Actions, GitLab CI, Azure DevOps, or any other CI system.
+
+**Pipeline stages:**
+1. **Audit** — structural checks (free)
+2. **Evaluate** — question bank accuracy (LLM-judged)
+3. **Deploy** — promote to production
 
 ---
 
 ## Configuring Thresholds
 
-Edit `instance/config/thresholds.yaml` to adjust quality gates per environment:
+Edit `config/thresholds.yaml` to adjust quality gates:
 
 ```yaml
 semantic_view:
@@ -349,21 +262,11 @@ agent:
 
 ---
 
-## GitHub Actions Secrets Required
-
-| Secret | Description |
-|--------|-------------|
-| `SNOWFLAKE_ACCOUNT` | Snowflake account identifier |
-| `SNOWFLAKE_USER` | Service account username |
-| `SNOWFLAKE_PASSWORD` | Service account password |
-| `SNOWFLAKE_CONNECTION_NAME` | Named connection (optional) |
-
----
-
 ## Documentation
 
 | Document | Type | What it covers |
 |----------|------|----------------|
+| [ci/README.md](ci/README.md) | Guide | CI/CD pipeline stages + env vars |
 | [docs/README.md](docs/README.md) | Index | Documentation map |
 | [Cost model](docs/reference/cost-model.md) | Reference | Evaluation cost in AI Credits |
 | [Input governance](docs/explanation/pillar-1-input-governance.md) | Explanation | Semantic view audit design |
@@ -372,7 +275,7 @@ agent:
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch → PR → merge workflow and commit conventions.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch → PR → merge workflow.
 
 ## License
 

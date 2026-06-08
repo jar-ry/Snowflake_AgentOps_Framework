@@ -2,141 +2,146 @@
 
 ## Project Overview
 
-This is an end-to-end framework for developing, testing, promoting, and monitoring **Semantic Views** and **Cortex Agents** in Snowflake. It targets data teams who want to self-serve semantic view development while maintaining production-grade quality gates via CI/CD.
+This is a governance framework for **Semantic Views** and **Cortex Agents** in Snowflake. Users clone the repo, bootstrap from their existing environment, and get CI/CD quality gates + monitoring — without creating new databases, RBAC roles, or data tables.
 
-This repo contains the **framework only** — no demo data, seed scripts, or bootstrap runner. Users configure their own instance via the `.cortex/skills/` or manually.
+The repo contains the **framework only**. Users point it at their existing objects via `config/environments.yaml`.
 
 ## Conventions
 
 - Always ask the user when unsure or when design decisions are needed
 - Always plan and document the plan before starting any work
-- Write all code to files so everything is reproducible (no ephemeral snippets)
+- Write all code to files so everything is reproducible
 - All SQL follows Snowflake SQL syntax
-- Python scripts use `snowflake-connector-python` and connect via named connections
-- YAML is used for configuration (environments, thresholds, question banks, monitoring)
-- GitHub Actions for CI/CD
+- Python scripts use `snowflake-connector-python` via named connections
+- YAML for configuration (environments, thresholds, question banks)
+- CI/CD is vendor-neutral (see `ci/README.md`)
 
 ## Snowflake Environment
 
-The framework creates three databases per project (configured in `instance/config/environments.yaml`):
+The framework creates its tables/views/alerts/tasks in a **single user-provided schema** (configured in `config/environments.yaml`):
 
-| Resource | Pattern |
+```yaml
+framework:
+  database: CUSTOMER_OPS     # existing database
+  schema: AGENTOPS           # created by the framework
+  warehouse: COMPUTE_WH     # existing warehouse
+```
+
+Everything the framework creates lives in `{{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}`. It does NOT create databases, warehouses, or RBAC roles.
+
+### What the framework creates (in the framework schema)
+
+| Category | Objects |
 |----------|---------|
-| DEV database | `<PROJECT>_DEV` |
-| PROD database | `<PROJECT>_PROD` |
-| Eval database | `<PROJECT>_EVAL` |
-| Schemas per env | `ANALYTICS` (tables), `SEMANTIC` (SV, agents, eval datasets) |
-| Monitoring schema | `<PROJECT>_EVAL.MONITORING` |
-| Observability schema | `<PROJECT>_EVAL.OBSERVABILITY` |
-| Results schema | `<PROJECT>_EVAL.RESULTS` |
-| Warehouse | `<PROJECT>_WH` (configurable size) |
-
-### RBAC Roles
-
-| Role | Purpose |
-|------|---------|
-| `<PROJECT>_ANALYST` | Create/edit SV in DEV, submit feedback, read results |
-| `<PROJECT>_REVIEWER` | Inherits Analyst, read access across envs |
-| `<PROJECT>_DEPLOYER` | Deploy SV/agents to DEV/PROD, write eval results, run tasks |
-| `<PROJECT>_ADMIN` | Full access to everything |
-
-Hierarchy: ANALYST → REVIEWER → ADMIN, DEPLOYER → ADMIN → SYSADMIN
-
-## Promotion Path (2-tier)
-
-```
-Feature branch → PR (CI: deploy to DEV + evaluate) → Merge to main → CD: promote to PROD
-```
+| Eval tables | SEMANTIC_VIEW_EVAL_RUNS, SEMANTIC_VIEW_EVAL_DETAILS |
+| Monitoring tables | USER_FEEDBACK, SCHEDULED_EVAL_RUNS, USAGE_METRICS, HEALTH_CHECK_RESULTS, ALERT_HISTORY, FEEDBACK_DAILY_SUMMARY, INTERACTION_QUALITY_DAILY |
+| Observability views | AGENT_TRACES, AGENT_REQUEST_SUMMARY, ANALYST_QUERIES, LLM_CALLS |
+| Monitoring views | V_EVAL_ACCURACY_TREND, V_FEEDBACK_TREND, V_TOKEN_COST_TREND, V_AGENT_USAGE_PATTERNS, V_HEALTH_DASHBOARD, V_ACTIVE_ALERTS, V_WEEKLY_EXECUTIVE_SUMMARY |
+| Quality views | V_REQUEST_QUALITY_SIGNALS, V_THREAD_QUALITY_SIGNALS, V_INTERACTION_QUALITY_FLAGS, V_INTERACTION_QUALITY_DASHBOARD |
+| Alerts | 7 alerts (feedback, accuracy, latency, cost, error, health, quality) |
+| Tasks | 3 tasks (daily usage, daily feedback, daily quality) |
 
 ## Directory Structure
 
 ```
 Snowflake_AgentOps_Framework/
-├── .cortex/skills/                     # Cortex Code skills
-│   └── bootstrap-from-existing.md    # Interactive bootstrap from existing env
-├── app/                                # App Runtime monitoring dashboard (Next.js)
-├── ci/                                 # CI/CD — vendor-neutral pipeline docs + examples
+├── .cortex/skills/
+│   └── bootstrap-from-existing.md    # Interactive bootstrap
+├── app/                                # App Runtime dashboard (Next.js)
+├── ci/                                 # CI/CD — vendor-neutral
 │   ├── README.md                      # Pipeline stages & wiring guide
 │   └── github/                        # GitHub Actions examples
 ├── config/                             # All configuration
-│   ├── defaults.yaml                  # Universal: LLM models + credit pricing
+│   ├── defaults.yaml                  # LLM models + credit pricing
 │   ├── environments.yaml.template     # Instance config template
 │   ├── monitoring.yaml.template       # Alert thresholds
 │   └── thresholds.yaml.template       # Eval accuracy thresholds
-├── evaluation/                         # All evaluation + monitoring Python
-│   ├── audit_semantic_view.py         # Best practices audit
+├── evaluation/                         # All Python (eval + monitoring)
+│   ├── audit_semantic_view.py         # Structural audit
 │   ├── audit_agent.py                 # Native GPA evaluation
-│   ├── evaluate_semantic_view.py      # Batch SV eval (SQL + LLM judge)
+│   ├── evaluate_semantic_view.py      # Batch SV eval
 │   ├── llm_judge.py                   # LLM-as-a-Judge
 │   ├── discover_account.py            # Account discovery
 │   ├── generate_question_bank.py      # Question-bank generator
 │   ├── health_check.py               # Health checks
 │   ├── cost_reconcile.py             # Cost reconciliation
-│   ├── adversarial_library.yaml       # Curated adversarial patterns
+│   ├── adversarial_library.yaml       # Adversarial patterns
 │   └── utils.py                       # Config loader + SF helpers
 ├── question_banks/                     # User's question banks
-├── setup/                              # Snowflake setup SQL
-│   ├── 00_framework_tables.sql        # All framework objects
-│   └── deploy.py                      # Deploy SV/agent (CI helper)
-└── docs/                              # Reference & explanation docs
+├── setup/
+│   ├── 00_framework_tables.sql        # All framework SQL objects
+│   └── deploy.py                      # Deploy helper (CI)
+└── docs/                              # Reference & explanation
 ```
 
 ## Key Technical Patterns
 
 ### Config Resolution
 
-Config lives in `config/environments.yaml` (created from the template during bootstrap). The `evaluation/utils.py` module loads it and merges with `config/defaults.yaml`. All paths are resolved relative to the repo root.
+Config lives in `config/environments.yaml` (populated during bootstrap). The `evaluation/utils.py` module loads it and merges with `config/defaults.yaml`. All paths resolve relative to repo root.
+
+- `config/defaults.yaml` — Universal: LLM models + per-model credit pricing
+- `config/environments.yaml` — Your framework DB, agents, semantic views
+- `config/thresholds.yaml` — Graduated accuracy thresholds
+- `config/monitoring.yaml` — Alert thresholds
+
+### Config Format (environments.yaml)
+
+```yaml
+connection_name: MY_CONNECTION
+
+framework:
+  database: MY_DB
+  schema: AGENTOPS
+  warehouse: MY_WH
+
+environments:
+  dev:
+    semantic_views:
+      - fqn: DB.SCHEMA.MY_SV
+        short_name: MY_SV
+    agents:
+      - fqn: DB.SCHEMA.MY_AGENT
+        short_name: MY_AGENT
+        semantic_views: [DB.SCHEMA.MY_SV]
+  prod:
+    semantic_views: []
+    agents: []
+
+question_banks:
+  agent_dir: question_banks/agent
+  semantic_view_dir: question_banks/semantic_view
+```
 
 ### Observability
-- **Primary source**: `snowflake.local.ai_observability_events` (Snowflake's native AI observability view)
-- No custom event table needed. Convenience views in `<PROJECT>_EVAL.OBSERVABILITY` wrap the native view.
-- Key span names: `ReasoningAgentStepPlanning-N`, `CodingAgent.Step-N`, `SqlExecution_CortexAnalyst`, `Agent`, `AgentV2RequestResponseInfo`
+
+- **Primary source**: `snowflake.local.ai_observability_events` (Snowflake's native AI observability)
+- No custom event table needed. Framework views wrap the native view.
+- Key span names: `ReasoningAgentStepPlanning-N`, `CodingAgent.Step-N`
 - Token fields: `snow.ai.observability.agent.planning.token_count.{input,output,total,cache_read_input}`
-- Agent identity: `snow.ai.observability.{database.name,schema.name,object.name,object.type}`
 
 ### Evaluation Pipeline (Two Layers)
 
-**Layer 1 — Audits (structural quality gate):**
-- `audit_semantic_view.py`: Parses YAML, checks documentation, naming, metadata, relationships, inconsistencies, duplicates. Severity-based pass/fail.
-- `audit_agent.py`: Uses Snowflake's native `EXECUTE_AI_EVALUATION` with GPA framework metrics plus custom LLM-judged metrics. Configurable per environment via `thresholds.yaml`.
+**Layer 1 — Audits (free, no LLM calls):**
+- `audit_semantic_view.py`: Parses YAML or live SV, checks documentation, naming, metadata, relationships.
 
-**Layer 2 — Question Bank Evaluation (accuracy gate):**
-- `evaluate_semantic_view.py`: Calls Cortex Analyst, compares generated SQL results to ground truth, uses LLM judge for ambiguous questions.
-
-### CI/CD (GitHub Actions)
-
-| Workflow | Trigger | What |
-|----------|---------|------|
-| `semantic_view_ci.yml` | PR on `instance/semantic_views/` | Audit → eval on DEV → PR comment |
-| `semantic_view_cd.yml` | Merge to main | Audit gate → eval on DEV → deploy to PROD |
-| `agent_ci.yml` | PR on `instance/agents/` | Deploy to DEV → native GPA eval → PR comment |
-| `agent_cd.yml` | Merge to main | Native GPA eval on DEV → deploy to PROD |
+**Layer 2 — Question Bank Evaluation (LLM-judged):**
+- `evaluate_semantic_view.py`: Calls Cortex Analyst, compares SQL results, uses LLM judge.
+- `audit_agent.py`: Uses Snowflake's native `EXECUTE_AI_EVALUATION` with GPA metrics.
 
 ### Connection Pattern
 
-Python scripts connect via named connection or env vars:
+Python scripts connect via named connection (from `config/environments.yaml`) or env vars:
 ```python
-import os, snowflake.connector
-conn = snowflake.connector.connect(
-    connection_name=os.getenv("SNOWFLAKE_CONNECTION_NAME") or "default"
-)
+# CI (headless): SNOWFLAKE_ACCOUNT + SNOWFLAKE_USER + SNOWFLAKE_PRIVATE_KEY
+# Local: connection_name from config resolves via ~/.snowflake/connections.toml
 ```
 
-### Configuration Files
+### CI/CD
 
-The framework reads a merged config: universal **defaults** at the repo root, overlaid by the active **instance** (set via `AIOPS_INSTANCE`, default `instance/`).
+See `ci/README.md`. Pipeline stages:
+1. Audit (structural, free)
+2. Evaluate (LLM-judged accuracy)
+3. Deploy (promote to prod)
 
-- `config/defaults.yaml` — Universal: LLM model selection + Snowflake per-model credit pricing
-- `instance/config/environments.yaml` — Per-env database, schema, warehouse, SV/agent names, paths
-- `instance/config/thresholds.yaml` — Graduated accuracy thresholds (DEV → PROD)
-- `instance/config/monitoring.yaml` — Alert thresholds, schedules, notifications
-- `instance/config/schedules.yaml` — Task schedule profiles (demo/prod)
-
-## GitHub Actions Secrets Required
-
-| Secret | Description |
-|--------|-------------|
-| `SNOWFLAKE_ACCOUNT` | Snowflake account identifier |
-| `SNOWFLAKE_USER` | Service account username |
-| `SNOWFLAKE_PASSWORD` | Service account password |
-| `SNOWFLAKE_CONNECTION_NAME` | Named connection (optional) |
+GitHub Actions examples in `ci/github/`. Portable to any CI system.

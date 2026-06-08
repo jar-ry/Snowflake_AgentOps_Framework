@@ -1,90 +1,69 @@
 # Contributing
 
-Thanks for your interest in improving the Snowflake AI Evaluation Framework. This
+Thanks for your interest in improving the Snowflake AgentOps Framework. This
 document describes how changes are proposed, reviewed, and merged.
-
-The framework's whole premise is a **governed branch → PR → merge loop**: changes
-to an agent, semantic view, or question bank are gated by CI before they reach a
-deployed environment. Contributions to the framework itself follow the same loop.
 
 ## Repository layout
 
-- **Framework (domain-agnostic)** lives at the repo root: `setup/`, `evaluation/`,
-  `monitoring/`, `config/defaults.yaml`, `.github/workflows/`, `docs/`.
-- **Instances (domain-specific)** live under `examples/<name>/` — the bundled
-  reference instance is `examples/retail/` (its config, semantic views, agents,
-  question banks, data, and demo material).
-
-A change is either a *framework* change (affects every instance) or an *instance*
-change (affects one example). Keep the two separate where practical — it makes
-review and CI scoping cleaner.
-
-To add a new instance, copy `examples/retail/` to `examples/<name>/` and edit only
-that folder. See the README for the full onboarding flow.
+- **Framework code** lives at the repo root: `setup/`, `evaluation/`, `app/`,
+  `config/defaults.yaml`, `ci/`, `docs/`.
+- **User configuration** lives in `config/` (environments, thresholds, monitoring).
+- **Question banks** live in `question_banks/`.
 
 ## Branching
 
 Cut a branch off `main`. Use a descriptive, prefixed name:
 
 ```text
-feat/<phase>-<issue>-<slug>     # new capability
-fix/<phase>-<issue>-<slug>      # bug fix
-docs/<phase>-<issue>-<slug>     # docs / governance
+feat/<slug>      # new capability
+fix/<slug>       # bug fix
+docs/<slug>      # documentation
 ```
-
-Examples from history: `feat/phase1-28-cost-calibration`,
-`docs/phase3-31-demo-credits`.
 
 ## Commits
 
-This repo uses [Conventional Commits](https://www.conventionalcommits.org/) with
-the relevant issue number in the scope:
+This repo uses [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```text
-feat(#28): calibrate cost model against measured actuals
-fix(#37): SV eval 0% — Cortex Analyst response-shape mismatch
-docs(#31): denominate demo cost figures in AI Credits
+feat: add cost anomaly detection to interaction quality engine
+fix: SV eval 0% — Cortex Analyst response-shape mismatch
+docs: update CI pipeline wiring guide for GitLab
 ```
 
 Write the body to explain the *why*, not just the *what*.
 
 ## Pull requests
 
-1. Open a PR into `main` and link the issue it addresses (`Closes #NN`).
-2. Assign it to the matching milestone (milestones map to delivery **phases**).
-3. Keep a PR scoped to one concern. Prefer several small, independently mergeable
-   PRs over one large one — disjoint file surfaces can land in parallel without
-   conflicts.
-4. CI must be green before merge (see below).
-5. PRs are **squash-merged**, so the PR title becomes the commit on `main` — give
-   it a clean Conventional-Commit title.
+1. Open a PR into `main`.
+2. Keep a PR scoped to one concern. Prefer several small, independently mergeable
+   PRs over one large one.
+3. CI must be green before merge (see below).
+4. PRs are **squash-merged**, so the PR title becomes the commit on `main`.
 
 ## CI gates
 
-Four workflows live in `.github/workflows/`:
+CI pipeline examples live in `ci/github/`. The pipeline stages are:
 
-| Workflow | Trigger | Purpose |
-| --- | --- | --- |
-| `semantic_view_ci.yml` | PR touching an instance's `semantic_views/` (or `evaluation/**`) | Offline structural audit → deploy to DEV → question-bank evaluation → PR comment |
-| `agent_ci.yml` | PR touching an instance's `agents/` / `question_banks/agent/` (or `evaluation/**`) | Native agent (GPA) evaluation → PR comment |
-| `semantic_view_cd.yml` | Merge to `main` | Promote semantic view to PROD |
-| `agent_cd.yml` | Merge to `main` | Promote agent to PROD |
+| Stage | Script | Purpose |
+|-------|--------|---------|
+| Audit | `python evaluation/audit_semantic_view.py` | Structural checks (free) |
+| Evaluate | `python evaluation/evaluate_semantic_view.py` | LLM-judged accuracy |
+| Agent eval | `python evaluation/audit_agent.py` | Native GPA evaluation |
+| Deploy | `python setup/deploy.py` | Promote to production |
 
-The active instance is resolved from the changed paths, so a PR that only touches
-framework code (`evaluation/**`) runs against the default instance. Docs-only PRs
-(for example `docs/`, `examples/*/demo/`) touch no gated path and run no eval.
+See [ci/README.md](ci/README.md) for full pipeline documentation and how to wire
+these into GitHub Actions, GitLab CI, or any other CI system.
 
 ## Local development
 
-- Python deps: `pip install -r requirements.txt`.
-- Evaluations and deploys need a Snowflake connection. Interactive (SSO) auth works
-  locally; **headless/CI runs require key-pair auth** (SSO browser auth blocks in CI).
-  Set `SNOWFLAKE_ACCOUNT` / `SNOWFLAKE_USER` / `SNOWFLAKE_PRIVATE_KEY` (and
-  `SNOWFLAKE_ROLE`) rather than relying on a named connection profile.
-- Run an evaluation against the bundled instance:
+- Python deps: `pip install -r requirements.txt`
+- Snowflake connection: configure a named connection in `~/.snowflake/connections.toml`
+  and set `connection_name` in `config/environments.yaml`.
+- For headless/CI: set `SNOWFLAKE_ACCOUNT` / `SNOWFLAKE_USER` / `SNOWFLAKE_PRIVATE_KEY`.
+- Run an evaluation:
 
   ```bash
-  AIOPS_INSTANCE=examples/retail python evaluation/audit_agent.py --environment dev
+  python evaluation/evaluate_semantic_view.py --environment dev
   ```
 
 - Cost: evaluations consume Snowflake AI Credits. See
@@ -94,5 +73,4 @@ framework code (`evaluation/**`) runs against the default instance. Docs-only PR
 
 This project is licensed under the **Apache License 2.0** — see [LICENSE](LICENSE)
 and [NOTICE](NOTICE). By submitting a Contribution, you agree that it is provided
-under the terms of that license (per Section 5 of the Apache License 2.0); no
-separate CLA is required.
+under the terms of that license.
