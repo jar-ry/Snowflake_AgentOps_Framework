@@ -55,7 +55,7 @@ CREATE OR REPLACE SEMANTIC VIEW BABY_MART_DEMO.ANALYTICS.CATEGORY_INTELLIGENCE_V
   AI_VERIFIED_QUERIES (
     'Which brands are losing the most customers in Nappies & Wipes?' AS (
       QUESTION 'Which brands are losing the most customers in Nappies & Wipes?'
-      VERIFIED_BY 'Jarry Chen'
+      VERIFIED_BY 'Jarry Che'
       SQL 'SELECT FROM_BRAND, TO_BRAND, SUM(SWITCH_COUNT) AS customers_switched FROM BABY_MART_DEMO.ANALYTICS.VW_SUPPLIER_SWITCHING WHERE CATEGORY ILIKE ''Nappies & Wipes'' GROUP BY FROM_BRAND, TO_BRAND ORDER BY customers_switched DESC NULLS LAST;'
     )
   );
