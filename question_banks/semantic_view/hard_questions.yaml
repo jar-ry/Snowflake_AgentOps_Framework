@@ -1,0 +1,46 @@
+# Question bank: Hard questions for CATEGORY_INTELLIGENCE_VIEW
+# Source: Existing eval dataset + verified queries (VQRs)
+# These require multi-table reasoning, YoY calculations, or complex filters.
+
+questions:
+  - question: "Show me the year-over-year growth for Nappies & Wipes by brand."
+    expected_behavior: "Query sellthrough or revenue data for Nappies & Wipes by brand across fiscal years, calculate YoY growth percentages."
+    difficulty: hard
+    tags: [calculation, yoy, multi-year, sellthrough]
+
+  - question: "Compare competitive pricing for Car Seats brands at Coles versus Woolworths in fiscal year 2025."
+    expected_behavior: "Query competitive positioning data filtered to Car Seats, Coles and Woolworths, and fiscal year 2025. Present pricing comparisons with price gaps."
+    difficulty: hard
+    tags: [multi-filter, comparison, competitive]
+
+  - question: "Which customer segment spends the most on Prams & Strollers?"
+    expected_behavior: "Query customer segment performance data for Prams & Strollers and identify the highest-spending segment with spending metric in AUD."
+    difficulty: hard
+    tags: [aggregation, ranking, segments]
+
+  - question: "Which brand are customers switching to most in the Car Seats category?"
+    expected_behavior: "Query brand switching data for Car Seats, aggregate by TO_BRAND to find the brand receiving the most customer switches."
+    difficulty: hard
+    tags: [aggregation, ranking, switching]
+
+  - question: "Which brands are losing the most customers in Nappies & Wipes?"
+    expected_sql: |
+      SELECT FROM_BRAND, TO_BRAND, SUM(SWITCH_COUNT) AS customers_switched
+      FROM BABY_MART_DEMO.ANALYTICS.VW_SUPPLIER_SWITCHING
+      WHERE CATEGORY ILIKE 'Nappies & Wipes'
+      GROUP BY FROM_BRAND, TO_BRAND
+      ORDER BY customers_switched DESC NULLS LAST
+    expected_behavior: "Query brand switching data for Nappies & Wipes, identifying brands with highest outgoing switch counts."
+    difficulty: hard
+    tags: [aggregation, ranking, switching, vqr]
+    source: verified_query
+
+  - question: "List the brands in the Feeding category that are sold in NSW stores in Metro regions."
+    expected_behavior: "Query sellthrough data filtered to Feeding category, NSW state, and Metro region to list distinct brand names."
+    difficulty: hard
+    tags: [multi-filter, list, sellthrough]
+
+  - question: "What promotion mechanics are used for Bugaboo in the Prams & Strollers category?"
+    expected_behavior: "Query promotional effectiveness data for Bugaboo in Prams & Strollers to list promotion mechanics."
+    difficulty: hard
+    tags: [multi-filter, promotions]

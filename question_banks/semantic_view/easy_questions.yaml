@@ -1,0 +1,34 @@
+# Question bank: Easy questions for CATEGORY_INTELLIGENCE_VIEW
+# Source: Existing eval dataset (BABY_MART_DEMO.AI.EVAL_SOURCE_CATEGORY_MANAGER)
+# These are single-table queries with direct lookups.
+
+questions:
+  - question: "What is the total revenue for the Prams & Strollers category in fiscal year 2025?"
+    expected_behavior: "Query revenue data filtered to Prams & Strollers category and fiscal year 2025. Lead with the total revenue figure in AUD."
+    difficulty: easy
+    tags: [single-table, filter, aggregation, sellthrough]
+
+  - question: "Which brand has the highest margin percentage in the Car Seats category?"
+    expected_behavior: "Query margin data for Car Seats and identify the top brand by margin percentage."
+    difficulty: easy
+    tags: [single-table, ranking, sellthrough]
+
+  - question: "How many stores sell Clothing products in Victoria?"
+    expected_behavior: "Query sellthrough data filtered to Clothing category and VIC state to count distinct stores."
+    difficulty: easy
+    tags: [single-table, count, filter, sellthrough]
+
+  - question: "Which stores in QLD carry Prams & Strollers brands?"
+    expected_behavior: "Query sellthrough data filtered to QLD state and Prams & Strollers category to list distinct store names."
+    difficulty: easy
+    tags: [single-table, list, filter, sellthrough]
+
+  - question: "What is the DIFOT performance for Huggies in fiscal year 2026?"
+    expected_behavior: "Query supplier DIFOT data filtered to Huggies brand and fiscal year 2026, returning delivery performance metrics."
+    difficulty: easy
+    tags: [single-table, filter, difot]
+
+  - question: "What promotion mechanics does Huggies use in the Nappies & Wipes category?"
+    expected_behavior: "Query promotional effectiveness data filtered to Huggies and Nappies & Wipes to list promotion mechanics."
+    difficulty: easy
+    tags: [single-table, filter, promotions]

@@ -1,0 +1,19 @@
+# Question bank: Ambiguous + out-of-scope questions for CATEGORY_INTELLIGENCE_VIEW
+# Source: Existing eval dataset
+# Tests boundary handling: clarification requests and scope refusal.
+
+questions:
+  - question: "What are the top selling brands?"
+    expected_behavior: "The agent should ask a clarifying question because the query is ambiguous — no category, time period, or metric specified. Per its instructions, it should ask ONE clarifying question before querying."
+    difficulty: ambiguous
+    tags: [clarification, ambiguous-scope]
+
+  - question: "Tell me about the weather forecast for Sydney this week."
+    expected_behavior: "The agent should decline this request and explain that weather is outside its capabilities. It handles only Baby Mart category analytics. It should NOT fabricate data."
+    difficulty: ambiguous
+    tags: [out-of-scope, refusal]
+
+  - question: "How is the business doing?"
+    expected_behavior: "The agent should ask a clarifying question — which category, brand, metric, or time period? The question is too broad without context."
+    difficulty: ambiguous
+    tags: [clarification, ambiguous-scope]

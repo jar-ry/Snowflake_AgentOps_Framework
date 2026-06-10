@@ -1,0 +1,54 @@
+# Question bank: Answerable questions for CATEGORY_MANAGER_AGENT
+# Source: Existing eval dataset (BABY_MART_DEMO.AI.EVAL_SOURCE_CATEGORY_MANAGER)
+# These test the full agent orchestration including tool selection.
+
+questions:
+  - question: "Show me the year-over-year growth for Nappies & Wipes by brand."
+    ground_truth: "The agent should query sellthrough or revenue data for the Nappies & Wipes category by brand across fiscal years, calculate YoY growth percentages, bold the key growth metrics, and suggest follow-up questions."
+    expected_tool: category_intelligence
+    difficulty: answerable
+
+  - question: "What is the total revenue for the Prams & Strollers category in fiscal year 2025?"
+    ground_truth: "The agent should query revenue data filtered to Prams & Strollers category and fiscal year 2025. Response should lead with the total revenue figure in AUD, bold the key metric, and suggest next steps."
+    expected_tool: category_intelligence
+    difficulty: answerable
+
+  - question: "Which brand has the highest margin percentage in the Car Seats category?"
+    ground_truth: "The agent should query margin data for Car Seats and identify the top brand by margin percentage. Response should bold the brand name and margin percentage."
+    expected_tool: category_intelligence
+    difficulty: answerable
+
+  - question: "Which customer segment spends the most on Prams & Strollers?"
+    ground_truth: "The agent should query customer segment performance data for Prams & Strollers and identify the highest-spending segment. Response should bold the segment name and spending metric in AUD."
+    expected_tool: category_intelligence
+    difficulty: answerable
+
+  - question: "Compare competitive pricing for Car Seats brands at Coles versus Woolworths in fiscal year 2025."
+    ground_truth: "The agent should query competitive positioning data filtered to Car Seats, Coles and Woolworths, and fiscal year 2025. Response should present pricing comparisons with bold key price gaps."
+    expected_tool: category_intelligence
+    difficulty: answerable
+
+  - question: "Which brands are losing the most customers in the Nappies & Wipes category based on brand switching data?"
+    ground_truth: "The agent should query brand switching data for Nappies & Wipes, identifying brands with highest outgoing switch counts."
+    expected_tool: category_intelligence
+    difficulty: answerable
+
+  - question: "What is the DIFOT performance for Huggies in fiscal year 2026?"
+    ground_truth: "The agent should query supplier DIFOT data filtered to Huggies brand and fiscal year 2026, returning delivery performance metrics."
+    expected_tool: category_intelligence
+    difficulty: answerable
+
+  - question: "What promotion mechanics does Huggies use in the Nappies & Wipes category?"
+    ground_truth: "The agent should query promotional effectiveness data filtered to Huggies and Nappies & Wipes to list promotion mechanics."
+    expected_tool: category_intelligence
+    difficulty: answerable
+
+  - question: "How many stores sell Clothing products in Victoria?"
+    ground_truth: "The agent should query sellthrough data filtered to Clothing category and VIC state to count distinct stores. Response should lead with the store count."
+    expected_tool: category_intelligence
+    difficulty: answerable
+
+  - question: "Which brand are customers switching to most in the Car Seats category?"
+    ground_truth: "The agent should query brand switching data for Car Seats, aggregate by TO_BRAND to find the brand receiving the most customer switches. Response should bold the brand name and switch count."
+    expected_tool: category_intelligence
+    difficulty: answerable
