@@ -7,6 +7,12 @@ on:
       - 'question_banks/semantic_view/**'
       - 'config/**'
       - 'evaluation/**'
+  push:
+    branches-ignore: [main]
+    paths:
+      - 'question_banks/semantic_view/**'
+      - 'config/**'
+      - 'evaluation/**'
 
 permissions:
   contents: read

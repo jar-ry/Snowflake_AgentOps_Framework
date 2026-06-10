@@ -7,6 +7,12 @@ on:
       - 'question_banks/agent/**'
       - 'config/**'
       - 'evaluation/**'
+  push:
+    branches-ignore: [main]
+    paths:
+      - 'question_banks/agent/**'
+      - 'config/**'
+      - 'evaluation/**'
 
 permissions:
   contents: read
