@@ -1,0 +1,95 @@
+name: Agent CD - Promote to PROD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'question_banks/agent/**'
+      - 'config/**'
+      - 'evaluation/**'
+
+jobs:
+  promote-agent-to-prod:
+    runs-on: ubuntu-latest
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+      SNOWFLAKE_PRIVATE_KEY_PASSPHRASE: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_PASSPHRASE }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve config
+        run: echo "Using config/environments.yaml"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run native Snowflake agent evaluation on DEV (GPA framework)
+        run: |
+          python evaluation/audit_agent.py \
+            --environment dev \
+            --metrics answer_correctness,logical_consistency,safety,groundedness,execution_efficiency \
+            --git-sha ${{ github.sha }} \
+            --git-branch main \
+            --timeout 600 \
+            --output agent_eval_results.json
+
+      - name: Check evaluation passed
+        run: |
+          python -c "
+          import json, sys
+          with open('agent_eval_results.json') as f:
+              results = json.load(f)
+          if not results.get('passed_threshold'):
+              avg = results.get('overall_average', 0)
+              print(f'NATIVE EVAL FAILED: Overall avg {avg}')
+              for metric, score in results.get('metric_averages', {}).items():
+                  print(f'  {metric}: {score:.3f}')
+              sys.exit(1)
+          print(f'Native eval PASSED: Overall avg {results.get(\"overall_average\", 0):.3f}')
+          "
+
+      - name: Deploy agent to PROD
+        run: python setup/deploy.py --target agent --environment prod
+
+      - name: Ensure PROD smoke-test task exists
+        run: |
+          python -c "
+          import os, sys
+          sys.path.insert(0, 'evaluation')
+          from utils import get_connection, load_config
+          cfg = load_config()
+          ev = cfg['eval']
+          db_eval = ev['database']
+          mon = ev['monitoring_schema']
+          wh = ev['warehouse']
+          conn = get_connection()
+          cur = conn.cursor()
+          # Create task only if it does not already exist
+          cur.execute(f'''
+              CREATE TASK IF NOT EXISTS {db_eval}.{mon}.TASK_WEEKLY_AGENT_EVAL
+              WAREHOUSE = {wh}
+              SCHEDULE = 'USING CRON 0 5 * * 0 UTC'
+              AS CALL {db_eval}.{mon}.SP_WEEKLY_AGENT_EVAL()
+          ''')
+          cur.execute(f'ALTER TASK IF EXISTS {db_eval}.{mon}.TASK_WEEKLY_AGENT_EVAL RESUME')
+          print('PROD smoke-test task TASK_WEEKLY_AGENT_EVAL ensured.')
+          conn.close()
+          "
+
+      - name: Upload results artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-prod-promotion-results
+          path: agent_eval_results.json

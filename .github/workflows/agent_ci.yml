@@ -1,0 +1,112 @@
+name: Agent CI - Evaluate on PR
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'question_banks/agent/**'
+      - 'config/**'
+      - 'evaluation/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  evaluate-agent:
+    name: "Native Snowflake Agent Evaluation"
+    runs-on: ubuntu-latest
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+      SNOWFLAKE_PRIVATE_KEY_PASSPHRASE: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_PASSPHRASE }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve config
+        run: echo "Using config/environments.yaml"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Deploy agent to DEV
+        run: python setup/deploy.py --target agent --environment dev
+
+      - name: Run native Snowflake agent evaluation (GPA framework)
+        run: |
+          python evaluation/audit_agent.py \
+            --environment dev \
+            --git-sha ${{ github.sha }} \
+            --git-branch ${{ github.head_ref }} \
+            --timeout 600 \
+            --output agent_eval_results.json
+
+      - name: Upload eval results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-eval-results
+          path: agent_eval_results.json
+
+      - name: Comment PR with results
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            let results;
+            try {
+              results = JSON.parse(fs.readFileSync('agent_eval_results.json', 'utf8'));
+            } catch (e) {
+              results = { status: 'NOT_RUN', metric_averages: {} };
+            }
+
+            const status = results.passed_threshold ? '✅ PASSED' :
+                           results.status === 'COMPLETED' ? '❌ FAILED' : '⚠️ ' + (results.status || 'NOT_RUN');
+
+            let metricTable = '';
+            const metrics = results.metric_averages || {};
+            for (const [metric, score] of Object.entries(metrics)) {
+              const icon = score >= 0.7 ? '✅' : score >= 0.5 ? '⚠️' : '❌';
+              metricTable += `| ${metric} | ${(score || 0).toFixed(3)} | ${icon} |\n`;
+            }
+
+            const snowsightLink = results.snowsight_url
+              ? `\n[View in Snowsight AI Observability](${results.snowsight_url})\n`
+              : '';
+
+            const body = `## Agent CI Results — Native GPA Evaluation ${status}
+
+            Uses Snowflake's built-in \`EXECUTE_AI_EVALUATION\` with GPA framework metrics.
+
+            | Metric | Average Score | Status |
+            |--------|---------------|--------|
+            ${metricTable || '| _No metrics available_ | - | - |'}
+
+            | Summary | Value |
+            |---------|-------|
+            | **Overall Average** | ${(results.overall_average || 0).toFixed(3)} |
+            | **Threshold** | ${results.accuracy_threshold || 'N/A'}% |
+            | **Total Records** | ${results.total_records || 'N/A'} |
+            | **Low Scores (<0.5)** | ${results.low_score_count || 'N/A'} |
+            ${snowsightLink}
+
+            > Commit: \`${{ github.sha }}\` | Branch: \`${{ github.head_ref }}\`
+            `;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
