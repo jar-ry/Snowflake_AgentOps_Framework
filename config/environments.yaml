@@ -11,10 +11,12 @@ environments:
     semantic_views:
       - fqn: BABY_MART_DEMO.ANALYTICS.CATEGORY_INTELLIGENCE_VIEW
         short_name: CATEGORY_INTELLIGENCE_VIEW
+        sql_path: semantic_views/category_intelligence_view.sql
 
     agents:
       - fqn: BABY_MART_DEMO.AI.CATEGORY_MANAGER_AGENT
         short_name: CATEGORY_MANAGER_AGENT
+        sql_path: agents/category_manager_agent.sql
         semantic_views:
           - BABY_MART_DEMO.ANALYTICS.CATEGORY_INTELLIGENCE_VIEW
 
