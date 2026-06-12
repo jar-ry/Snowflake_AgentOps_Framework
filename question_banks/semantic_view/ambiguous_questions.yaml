@@ -1,0 +1,30 @@
+questions:
+  - question: "Which customers are the best?"
+    expected_behavior: "Ambiguous — 'best' is undefined. Should ask a clarifying question (best by balance, income, portfolio value, tenure?)."
+    difficulty: ambiguous
+    tags: [clarification]
+
+  - question: "Show me the risky accounts."
+    expected_behavior: "Ambiguous — 'risky' is undefined. Should ask whether risk means risk level, risk score threshold, flagged transactions, or low credit score."
+    difficulty: ambiguous
+    tags: [clarification]
+
+  - question: "How is the portfolio doing?"
+    expected_behavior: "Ambiguous — which portfolio? Should ask for a portfolio code/customer, or clarify metric (YTD return, total value, PnL)."
+    difficulty: ambiguous
+    tags: [clarification]
+
+  - question: "What will our revenue be next quarter?"
+    expected_behavior: "Out of scope — no forecasting data. Should decline and explain it can only report on historical/current data in the semantic view."
+    difficulty: ambiguous
+    tags: [out-of-scope, forecasting]
+
+  - question: "What is the weather like for our London customers?"
+    expected_behavior: "Out of scope — no weather data. Should politely decline and state the finance topics it can help with."
+    difficulty: ambiguous
+    tags: [out-of-scope]
+
+  - question: "Tell me about recent activity."
+    expected_behavior: "Ambiguous — 'activity' and 'recent' undefined. Should ask whether transactions, account openings, or risk assessments, and the time window."
+    difficulty: ambiguous
+    tags: [clarification]

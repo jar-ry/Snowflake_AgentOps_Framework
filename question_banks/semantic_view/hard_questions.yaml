@@ -1,0 +1,40 @@
+questions:
+  - question: "What is the total account balance for each customer segment?"
+    expected_behavior: "Join ACCOUNTS to CUSTOMERS, GROUP BY CUSTOMER_SEGMENT, SUM(BALANCE)."
+    difficulty: hard
+    tags: [accounts, customers, join, group-by]
+
+  - question: "Which customers have a portfolio with negative unrealized PnL, and what is the total negative PnL per customer?"
+    expected_behavior: "Join PORTFOLIOS to CUSTOMERS, filter UNREALIZED_PNL < 0, GROUP BY customer, SUM."
+    difficulty: hard
+    tags: [portfolios, customers, join, filter]
+
+  - question: "What is the average risk score by risk type for customers in the High Net Worth segment?"
+    expected_behavior: "Join RISK_ASSESSMENTS to CUSTOMERS, filter CUSTOMER_SEGMENT = 'High Net Worth', GROUP BY RISK_TYPE, AVG(RISK_SCORE)."
+    difficulty: hard
+    tags: [risk, customers, join, average]
+
+  - question: "What is the total transaction amount by channel for accounts of type Investment?"
+    expected_behavior: "Join TRANSACTIONS to ACCOUNTS, filter ACCOUNT_TYPE = 'Investment', GROUP BY TRANSACTION channel, SUM(AMOUNT)."
+    difficulty: hard
+    tags: [transactions, accounts, join, group-by]
+
+  - question: "Which customer segment has the highest average portfolio YTD return percentage?"
+    expected_behavior: "Join PORTFOLIOS to CUSTOMERS, GROUP BY CUSTOMER_SEGMENT, AVG(YTD_RETURN_PCT), ORDER BY desc, top 1."
+    difficulty: hard
+    tags: [portfolios, customers, join, ranking]
+
+  - question: "What percentage of portfolios are profitable (unrealized PnL greater than zero)?"
+    expected_behavior: "From PORTFOLIOS, COUNT_IF(UNREALIZED_PNL > 0) * 100.0 / COUNT(*)."
+    difficulty: hard
+    tags: [portfolios, ratio]
+
+  - question: "For each risk level, how many distinct customers have an open risk assessment?"
+    expected_behavior: "From RISK_ASSESSMENTS filter STATUS in open-like states, GROUP BY RISK_LEVEL, COUNT(DISTINCT CUSTOMER_ID)."
+    difficulty: hard
+    tags: [risk, distinct, group-by]
+
+  - question: "Compare total credit (incoming) versus total debit (outgoing) transaction amounts per account type."
+    expected_behavior: "Join TRANSACTIONS to ACCOUNTS, pivot/aggregate AMOUNT by DIRECTION within ACCOUNT_TYPE."
+    difficulty: hard
+    tags: [transactions, accounts, join, comparison]

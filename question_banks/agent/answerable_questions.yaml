@@ -1,0 +1,40 @@
+questions:
+  - question: "How many customers are in each customer segment?"
+    ground_truth: "Returns a count of customers grouped by CUSTOMER_SEGMENT using the finance semantic view."
+    expected_tool: cortex_analyst_text_to_sql
+    difficulty: answerable
+
+  - question: "What is the total balance of all open accounts?"
+    ground_truth: "SUM(BALANCE) filtered to ACCOUNT_STATUS = 'Open'."
+    expected_tool: cortex_analyst_text_to_sql
+    difficulty: answerable
+
+  - question: "Which 5 customers have the highest total portfolio value?"
+    ground_truth: "Join portfolios to customers, aggregate TOTAL_VALUE per customer, order desc, limit 5."
+    expected_tool: cortex_analyst_text_to_sql
+    difficulty: answerable
+
+  - question: "What is the average risk score for fraud risk assessments?"
+    ground_truth: "AVG(RISK_SCORE) where RISK_TYPE = 'Fraud Risk'."
+    expected_tool: cortex_analyst_text_to_sql
+    difficulty: answerable
+
+  - question: "How many flagged transactions occurred through the Mobile App channel?"
+    ground_truth: "COUNT from TRANSACTIONS where IS_FLAGGED = TRUE and CHANNEL = 'Mobile App'."
+    expected_tool: cortex_analyst_text_to_sql
+    difficulty: answerable
+
+  - question: "What is the total transaction amount by direction (credit vs debit)?"
+    ground_truth: "GROUP BY DIRECTION, SUM(AMOUNT) from TRANSACTIONS."
+    expected_tool: cortex_analyst_text_to_sql
+    difficulty: answerable
+
+  - question: "List portfolios with a YTD return below -5%."
+    ground_truth: "Filter PORTFOLIOS where YTD_RETURN_PCT < -5."
+    expected_tool: cortex_analyst_text_to_sql
+    difficulty: answerable
+
+  - question: "How many accounts were opened through the Online channel?"
+    ground_truth: "COUNT from ACCOUNTS where CHANNEL = 'Online'."
+    expected_tool: cortex_analyst_text_to_sql
+    difficulty: answerable

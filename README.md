@@ -67,7 +67,15 @@ A governance framework for **Semantic Views** and **Cortex Agents** in Snowflake
 
 ### Bootstrap with Cortex Code (Recommended)
 
-Open this repo in Cortex Code and invoke the bootstrap skill:
+Fork and clone this repo, then open it in Cortex Code.
+
+Register the bundled skill once per clone (Cortex Code does not auto-discover `.cortex/skills/`):
+
+```
+/skill add ./.cortex/skills/bootstrap-from-existing
+```
+
+Then invoke it:
 
 ```
 /bootstrap-from-existing
@@ -118,7 +126,8 @@ sql = sql.replace('{{WAREHOUSE}}', 'YOUR_WH')
 ```
 Snowflake_AgentOps_Framework/
 ├── .cortex/skills/                     # Cortex Code skills
-│   └── bootstrap-from-existing.md    # Interactive bootstrap from existing env
+│   └── bootstrap-from-existing/       # Interactive bootstrap from existing env
+│       └── SKILL.md
 ├── app/                                # App Runtime monitoring dashboard (Next.js)
 │   ├── app.yml                        # App Runtime manifest
 │   ├── package.json

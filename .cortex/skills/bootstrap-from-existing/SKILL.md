@@ -1,3 +1,8 @@
+---
+name: bootstrap-from-existing
+description: "Discover a customer's existing Snowflake semantic views and agents, generate a populated environments.yaml config, and create the AgentOps framework tables in a user-specified schema. Use when adding the AgentOps evaluation/monitoring framework on top of already-deployed semantic views and/or agents without creating new databases, RBAC roles, or data tables. Triggers: bootstrap, bootstrap from existing, bootstrap-from-existing, add agentops to existing environment, govern existing semantic views, govern existing agents, onboard existing agents."
+---
+
 # Bootstrap from Existing Environment
 
 This skill discovers a customer's existing Snowflake semantic views and agents, then generates a populated `environments.yaml` config and creates the framework's internal tables in a user-specified schema.

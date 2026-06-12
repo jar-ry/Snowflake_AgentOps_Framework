@@ -1,0 +1,40 @@
+questions:
+  - question: "How many customers do we have?"
+    expected_behavior: "Count of rows in CUSTOMERS."
+    difficulty: easy
+    tags: [customers, count]
+
+  - question: "What is the total balance across all accounts?"
+    expected_behavior: "SUM(BALANCE) from ACCOUNTS."
+    difficulty: easy
+    tags: [accounts, sum]
+
+  - question: "List all account types and how many accounts are in each."
+    expected_behavior: "GROUP BY ACCOUNT_TYPE with COUNT from ACCOUNTS."
+    difficulty: easy
+    tags: [accounts, group-by]
+
+  - question: "How many transactions were flagged?"
+    expected_behavior: "COUNT from TRANSACTIONS where IS_FLAGGED = TRUE."
+    difficulty: easy
+    tags: [transactions, filter]
+
+  - question: "What is the average credit score of our customers?"
+    expected_behavior: "AVG(CREDIT_SCORE) from CUSTOMERS."
+    difficulty: easy
+    tags: [customers, average]
+
+  - question: "How many risk assessments have a Critical risk level?"
+    expected_behavior: "COUNT from RISK_ASSESSMENTS where RISK_LEVEL = 'Critical'."
+    difficulty: easy
+    tags: [risk, filter]
+
+  - question: "What is the total value of all portfolios?"
+    expected_behavior: "SUM(TOTAL_VALUE) from PORTFOLIOS."
+    difficulty: easy
+    tags: [portfolios, sum]
+
+  - question: "How many accounts are currently Open?"
+    expected_behavior: "COUNT from ACCOUNTS where ACCOUNT_STATUS = 'Open'."
+    difficulty: easy
+    tags: [accounts, filter]
