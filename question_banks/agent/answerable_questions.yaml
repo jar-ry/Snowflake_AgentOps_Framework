@@ -1,0 +1,40 @@
+questions:
+  - question: "How many customers do we have in each segment?"
+    ground_truth: "Returns count grouped by customer_segment showing distribution across High Net Worth, Corporate, Institutional, etc."
+    expected_tool: finance-analytics-assistant
+    difficulty: answerable
+
+  - question: "What is the total balance across all open accounts?"
+    ground_truth: "Returns sum of balance from accounts where account_status = 'Open'"
+    expected_tool: finance-analytics-assistant
+    difficulty: answerable
+
+  - question: "Show me the top 10 customers by annual income"
+    ground_truth: "Returns customer names and annual income ordered by income descending, limited to 10"
+    expected_tool: finance-analytics-assistant
+    difficulty: answerable
+
+  - question: "What is the average portfolio YTD return by strategy?"
+    ground_truth: "Returns average ytd_return_pct grouped by strategy (Balanced, Income, Aggressive, etc.)"
+    expected_tool: finance-analytics-assistant
+    difficulty: answerable
+
+  - question: "How many critical risk assessments are still under review?"
+    ground_truth: "Returns count of risk_assessments where risk_level = 'Critical' and status = 'Under Review'"
+    expected_tool: finance-analytics-assistant
+    difficulty: answerable
+
+  - question: "What is the total transaction volume by channel for this month?"
+    ground_truth: "Returns sum of amount grouped by channel (Branch, Mobile App, ATM, etc.) for current month"
+    expected_tool: finance-analytics-assistant
+    difficulty: answerable
+
+  - question: "Which customers have more than 3 accounts?"
+    ground_truth: "Joins accounts to customers, groups by customer, filters for count > 3, shows customer details"
+    expected_tool: finance-analytics-assistant
+    difficulty: answerable
+
+  - question: "What percentage of transactions are flagged?"
+    ground_truth: "Calculates the ratio of flagged transactions to total transactions as a percentage"
+    expected_tool: finance-analytics-assistant
+    difficulty: answerable

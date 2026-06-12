@@ -1,0 +1,50 @@
+questions:
+  - question: "What is the average account balance by customer segment?"
+    expected_behavior: "Joins accounts to customers and groups by customer_segment, showing average balance per segment"
+    difficulty: hard
+    tags: [accounts, customers, join, aggregation]
+
+  - question: "Which customers have portfolios with negative unrealized P&L and also have high-risk assessments?"
+    expected_behavior: "Multi-table join across customers, portfolios, and risk_assessments filtering for unrealized_pnl < 0 and risk_level in ('High', 'Critical')"
+    difficulty: hard
+    tags: [customers, portfolios, risk_assessments, multi-join, complex-filter]
+
+  - question: "What is the total transaction amount per category for the last 30 days, ranked by amount?"
+    expected_behavior: "Filters transactions by date range, groups by category, orders by total amount descending"
+    difficulty: hard
+    tags: [transactions, time-filter, aggregation, ranking]
+
+  - question: "Show me the top 5 customers by total portfolio value with their number of open accounts"
+    expected_behavior: "Joins customers to portfolios and accounts, aggregates portfolio value and counts open accounts, limits to top 5"
+    difficulty: hard
+    tags: [customers, portfolios, accounts, multi-join, top-n]
+
+  - question: "What percentage of transactions are flagged by transaction channel?"
+    expected_behavior: "Groups transactions by channel, calculates flagged percentage per channel"
+    difficulty: hard
+    tags: [transactions, percentage, group-by]
+
+  - question: "Which account types have the highest average interest rate and what is the average balance for those types?"
+    expected_behavior: "Groups accounts by type, calculates avg interest rate and avg balance, orders by interest rate descending"
+    difficulty: hard
+    tags: [accounts, aggregation, multi-metric]
+
+  - question: "Compare the average YTD return across different portfolio strategies for active portfolios only"
+    expected_behavior: "Filters portfolios where status = 'Active', groups by strategy, shows average ytd_return_pct"
+    difficulty: hard
+    tags: [portfolios, filter, aggregation, comparison]
+
+  - question: "How many unresolved risk assessments does each customer segment have?"
+    expected_behavior: "Joins risk_assessments to customers (via accounts or directly), filters for non-closed status, groups by segment"
+    difficulty: hard
+    tags: [risk_assessments, customers, join, filter, aggregation]
+
+  - question: "What is the month-over-month growth in transaction volume?"
+    expected_behavior: "Truncates transaction_timestamp to month, counts transactions per month, calculates growth rate"
+    difficulty: hard
+    tags: [transactions, time-series, calculation, window-function]
+
+  - question: "Which cities have the highest concentration of high-net-worth customers with aggressive portfolio strategies?"
+    expected_behavior: "Joins customers to portfolios, filters for High Net Worth segment and Aggressive strategy, groups by city"
+    difficulty: hard
+    tags: [customers, portfolios, join, multi-filter, geographic]

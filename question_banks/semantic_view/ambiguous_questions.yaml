@@ -1,0 +1,40 @@
+questions:
+  - question: "How is the market doing?"
+    expected_behavior: "Should ask for clarification - the semantic view contains portfolio/account data but not market indices"
+    difficulty: ambiguous
+    tags: [out-of-scope, clarification-needed]
+
+  - question: "Show me everything about customer 42"
+    expected_behavior: "Should ask which aspects the user wants (accounts, portfolios, transactions, risk assessments) rather than dumping all data"
+    difficulty: ambiguous
+    tags: [clarification-needed, too-broad]
+
+  - question: "Are our numbers good?"
+    expected_behavior: "Should ask for clarification about which metrics or KPIs the user is referring to"
+    difficulty: ambiguous
+    tags: [clarification-needed, vague]
+
+  - question: "What's the weather forecast for next week?"
+    expected_behavior: "Should politely decline - weather data is completely outside the scope of the finance analytics view"
+    difficulty: ambiguous
+    tags: [out-of-scope, decline]
+
+  - question: "Compare us to our competitors"
+    expected_behavior: "Should explain that the data only covers internal customer/account data, not competitor benchmarks"
+    difficulty: ambiguous
+    tags: [out-of-scope, clarification-needed]
+
+  - question: "Is this customer risky?"
+    expected_behavior: "Should ask which customer and clarify that it can show risk assessment data but not make subjective risk judgments"
+    difficulty: ambiguous
+    tags: [clarification-needed, missing-identifier]
+
+  - question: "What happened last quarter?"
+    expected_behavior: "Should ask for clarification about which metrics/aspects (transactions, portfolios, risk assessments) the user wants to review"
+    difficulty: ambiguous
+    tags: [clarification-needed, too-broad]
+
+  - question: "Fix the data in the accounts table"
+    expected_behavior: "Should decline - the agent is read-only and cannot modify data"
+    difficulty: ambiguous
+    tags: [out-of-scope, decline, destructive]

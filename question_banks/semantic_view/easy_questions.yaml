@@ -1,0 +1,50 @@
+questions:
+  - question: "How many customers do we have?"
+    expected_behavior: "Returns a single count of all customers"
+    difficulty: easy
+    tags: [customers, count, single-table]
+
+  - question: "What is the total balance across all accounts?"
+    expected_behavior: "Returns the sum of the balance column from the accounts table"
+    difficulty: easy
+    tags: [accounts, aggregation, single-table]
+
+  - question: "How many accounts are currently open?"
+    expected_behavior: "Returns count of accounts where account_status = 'Open'"
+    difficulty: easy
+    tags: [accounts, filter, single-table]
+
+  - question: "What are the different customer segments?"
+    expected_behavior: "Returns distinct values from customer_segment column"
+    difficulty: easy
+    tags: [customers, distinct, single-table]
+
+  - question: "How many transactions were flagged?"
+    expected_behavior: "Returns count of transactions where is_flagged = TRUE"
+    difficulty: easy
+    tags: [transactions, filter, single-table]
+
+  - question: "What is the average credit score of our customers?"
+    expected_behavior: "Returns the average of the credit_score column"
+    difficulty: easy
+    tags: [customers, aggregation, single-table]
+
+  - question: "How many portfolios have a high risk tolerance?"
+    expected_behavior: "Returns count of portfolios where risk_tolerance = 'High'"
+    difficulty: easy
+    tags: [portfolios, filter, single-table]
+
+  - question: "What are the different account types?"
+    expected_behavior: "Returns distinct values from account_type column"
+    difficulty: easy
+    tags: [accounts, distinct, single-table]
+
+  - question: "What is the total value of all portfolios?"
+    expected_behavior: "Returns sum of total_value from portfolios table"
+    difficulty: easy
+    tags: [portfolios, aggregation, single-table]
+
+  - question: "How many risk assessments have critical risk level?"
+    expected_behavior: "Returns count of risk_assessments where risk_level = 'Critical'"
+    difficulty: easy
+    tags: [risk_assessments, filter, single-table]
