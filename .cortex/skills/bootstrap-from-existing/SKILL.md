@@ -306,13 +306,15 @@ If the user agrees:
    GRANT ROLE <minimal_role> TO USER AGENTOPS_CI_USER;
    ```
 
-5. Ensure that role can create the agent-evaluation objects at runtime. `audit_agent.py` creates an eval-data table (`<AGENT>_EVAL_DATA`), a config stage (`AGENT_EVAL_CONFIG_STAGE`), and an AI evaluation dataset inside the framework schema on every run. If the CI role does NOT own that schema (it usually won't), grant it these creation privileges — otherwise the agent CI fails with an insufficient-privilege error when it tries to create the stage/dataset, even though the question banks are valid:
+5. Ensure that role can create the agent-evaluation objects at runtime. `audit_agent.py` calls Snowflake's native `EXECUTE_AI_EVALUATION`, which inside the framework schema (a) creates an eval-data table (`<AGENT>_EVAL_DATA`), (b) creates a config stage (`AGENT_EVAL_CONFIG_STAGE`), (c) creates an AI evaluation dataset, and (d) runs the agent **asynchronously via a task**. If the CI role does NOT own that schema (it usually won't), grant it all of these privileges — otherwise the agent CI fails with an insufficient-privilege error (e.g. "Failed to create evaluation task ... must have CREATE TASK"), even though the question banks are valid:
    ```sql
-   GRANT CREATE TABLE   ON SCHEMA <framework_db>.<framework_schema> TO ROLE <minimal_role>;
-   GRANT CREATE STAGE   ON SCHEMA <framework_db>.<framework_schema> TO ROLE <minimal_role>;
-   GRANT CREATE DATASET ON SCHEMA <framework_db>.<framework_schema> TO ROLE <minimal_role>;
+   GRANT CREATE TABLE   ON SCHEMA  <framework_db>.<framework_schema> TO ROLE <minimal_role>;
+   GRANT CREATE STAGE   ON SCHEMA  <framework_db>.<framework_schema> TO ROLE <minimal_role>;
+   GRANT CREATE DATASET ON SCHEMA  <framework_db>.<framework_schema> TO ROLE <minimal_role>;
+   GRANT CREATE TASK    ON SCHEMA  <framework_db>.<framework_schema> TO ROLE <minimal_role>;
+   GRANT EXECUTE TASK   ON ACCOUNT                                   TO ROLE <minimal_role>;
    ```
-   (Skip any grant the role already holds; if the CI role owns the framework schema, ownership already implies all three.)
+   `EXECUTE TASK ON ACCOUNT` is an account-level privilege, so it must be granted by ACCOUNTADMIN. Skip any grant the role already holds; if the CI role owns the framework schema, ownership already implies the schema-level grants (but `EXECUTE TASK ON ACCOUNT` is still required regardless of ownership).
 
 6. Tell the user: set the `SNOWFLAKE_USER` GitHub secret to `AGENTOPS_CI_USER` (instead of their own username), and use the matching private key for `SNOWFLAKE_PRIVATE_KEY`. The rest of the account stays locked to the existing network policy.
 
