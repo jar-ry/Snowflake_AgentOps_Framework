@@ -316,7 +316,16 @@ If the user agrees:
    ```
    `EXECUTE TASK ON ACCOUNT` is an account-level privilege, so it must be granted by ACCOUNTADMIN. Skip any grant the role already holds; if the CI role owns the framework schema, ownership already implies the schema-level grants (but `EXECUTE TASK ON ACCOUNT` is still required regardless of ownership).
 
-6. Tell the user: set the `SNOWFLAKE_USER` GitHub secret to `AGENTOPS_CI_USER` (instead of their own username), and use the matching private key for `SNOWFLAKE_PRIVATE_KEY`. The rest of the account stays locked to the existing network policy.
+6. Grant the role the privileges native agent evaluation requires **on each governed agent and its database/schema**. `EXECUTE_AI_EVALUATION` needs both `USAGE` (to invoke the agent) and `MONITOR` (to read its evaluation runs) — `USAGE` alone makes `START` fail with a misleading `Run <name> not found for object ... type CORTEX AGENT` error, which the script only surfaces as a downstream "run not found" status. For each agent selected in Step 2:
+   ```sql
+   GRANT USAGE   ON DATABASE <agent_db>                       TO ROLE <minimal_role>;
+   GRANT USAGE   ON SCHEMA   <agent_db>.<agent_schema>        TO ROLE <minimal_role>;
+   GRANT USAGE   ON AGENT    <agent_fqn>                      TO ROLE <minimal_role>;
+   GRANT MONITOR ON AGENT    <agent_fqn>                      TO ROLE <minimal_role>;
+   ```
+   `MONITOR` is read-only (it does not allow altering the agent), so granting it to a CI role keeps the customer's agent under their ownership. The role must also be able to reach every tool the agent uses (e.g. `SELECT` on the bound semantic view's tables and `REFERENCES`/`SELECT` on the semantic view) — the framework grants for the governed objects in Step 5 cover this.
+
+7. Tell the user: set the `SNOWFLAKE_USER` GitHub secret to `AGENTOPS_CI_USER` (instead of their own username), and use the matching private key for `SNOWFLAKE_PRIVATE_KEY`. The rest of the account stays locked to the existing network policy.
 
 ### Step 8: Verify & Report
 
