@@ -8,6 +8,10 @@ __pycache__/
 *.json
 !config/**/*.json
 !examples/**/*.json
+# React dashboard scaffolding must be tracked (App Runtime `npm ci` needs the lockfile)
+!app/package.json
+!app/package-lock.json
+!app/tsconfig.json
 
 # Auto-generated question-bank previews (issue #21). Drafts to be reviewed and
 # promoted up into question_banks/<type>/; the promoted (curated) banks stay tracked.

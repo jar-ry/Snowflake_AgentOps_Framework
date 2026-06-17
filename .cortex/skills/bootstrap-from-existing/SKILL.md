@@ -117,6 +117,17 @@ For each of these, copy the template to the un-suffixed filename verbatim (the d
 
 Use the Write tool for both. Do not modify the values — just materialize the files so they are present and committable. Tell the customer these were created from defaults and where to tune them.
 
+#### Also point the monitoring dashboard at the framework schema
+
+The React (App Runtime) dashboard in `app/` queries the framework's monitoring objects by **unqualified** name, so the deployed app must default its Snowflake session to the framework database/schema. There is no env-injection mechanism in App Runtime, so the app reads these from a small config module. Write `app/lib/agentops.config.ts` with the chosen framework location:
+
+```ts
+export const FRAMEWORK_DB = "<chosen_database>"
+export const FRAMEWORK_SCHEMA = "<chosen_schema>"
+```
+
+Use the same `<chosen_database>` and `<chosen_schema>` selected in Step 3 (they must match `framework.database` / `framework.schema` in `config/environments.yaml`). Without this, the deployed dashboard fails every query with `Object '...' does not exist or not authorized`.
+
 ### Step 5: Create Framework Tables
 
 Read `setup/00_framework_tables.sql` and perform token substitution:
