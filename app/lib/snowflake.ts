@@ -42,6 +42,7 @@ import fs from "fs"
 import path from "path"
 import os from "os"
 import snowflake from "snowflake-sdk"
+import { FRAMEWORK_DB, FRAMEWORK_SCHEMA } from "./agentops.config"
 
 snowflake.configure({
   logLevel: "ERROR",
@@ -191,8 +192,13 @@ function baseConfig(): snowflake.ConnectionOptions {
     base.accessUrl = `https://${process.env.SNOWFLAKE_HOST}`
   }
   if (process.env.SNOWFLAKE_ROLE) base.role = process.env.SNOWFLAKE_ROLE
-  if (process.env.SNOWFLAKE_DATABASE) base.database = process.env.SNOWFLAKE_DATABASE
-  if (process.env.SNOWFLAKE_SCHEMA) base.schema = process.env.SNOWFLAKE_SCHEMA
+  // Default the session to the framework's database/schema so the dashboard's
+  // unqualified queries resolve. Runtime env vars win; otherwise fall back to
+  // the bootstrap-populated values in agentops.config.ts.
+  const fwDatabase = process.env.SNOWFLAKE_DATABASE || FRAMEWORK_DB
+  const fwSchema = process.env.SNOWFLAKE_SCHEMA || FRAMEWORK_SCHEMA
+  if (fwDatabase) base.database = fwDatabase
+  if (fwSchema) base.schema = fwSchema
   return base
 }
 
@@ -404,6 +410,18 @@ function queryWithPool(
   authTag: string,
 ): Promise<Record<string, any>[]> {
   return pool.use(async (conn) => {
+    // Force the framework schema — the OAuth `schema` connection option is
+    // unreliable on the SPCS owner's-rights path, leaving CURRENT_SCHEMA null
+    // so unqualified object names fail to resolve.
+    const fqSchema = `${FRAMEWORK_DB}.${FRAMEWORK_SCHEMA}`
+    if (FRAMEWORK_DB && FRAMEWORK_SCHEMA) {
+      await new Promise<void>((res, rej) =>
+        conn.execute({
+          sqlText: `USE SCHEMA ${fqSchema}`,
+          complete: (err) => (err ? rej(new Error(`USE SCHEMA failed: ${err.message}`)) : res()),
+        }),
+      )
+    }
     const t0 = Date.now()
     sfLog(`query start mode=${authTag} sql=${JSON.stringify(previewSql(query))}`)
     return new Promise<Record<string, any>[]>((res, rej) => {
