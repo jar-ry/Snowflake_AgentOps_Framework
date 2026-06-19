@@ -1,6 +1,6 @@
 ---
 name: bootstrap-from-existing
-description: Bootstrap the AgentOps governance framework from an existing Snowflake environment. Use when a user wants to add evaluation, monitoring, or CI/CD governance on top of semantic views and/or Cortex Agents they already have deployed. Discovers existing semantic views and agents (SHOW SEMANTIC VIEWS/AGENTS IN ACCOUNT), lets the user select which to govern, generates config/environments.yaml, creates the framework's tables/views/alerts/tasks in a chosen schema, and seeds starter question banks. Triggers on phrases like "bootstrap from existing", "onboard my agents to AgentOps", "set up governance for my semantic view", "add monitoring to my Cortex Agent", "wire up the AgentOps framework".
+description: Bootstrap the AgentOps governance framework from an existing Snowflake environment. Use when a user wants to add evaluation, monitoring, or CI/CD governance on top of semantic views and/or Cortex Agents they already have deployed. Lets the user choose where to search (entire account, or specific databases/schemas) before discovering existing semantic views and agents (SHOW SEMANTIC VIEWS/AGENTS scoped to that location), lets the user select which to govern, generates config/environments.yaml, creates the framework's tables/views/alerts/tasks in a chosen schema, and seeds starter question banks. Triggers on phrases like "bootstrap from existing", "onboard my agents to AgentOps", "set up governance for my semantic view", "add monitoring to my Cortex Agent", "wire up the AgentOps framework".
 ---
 
 # Bootstrap from Existing Environment
@@ -11,17 +11,13 @@ Use this when the customer already has semantic views and/or agents deployed and
 
 ## Workflow
 
-### Step 1: Discover Existing Objects
+### Step 1: Choose Where to Search, Then Discover Existing Objects
 
-Run the following SQL queries using `snowflake_sql_execute` to discover what's already in the account:
+Discovering objects with `IN ACCOUNT` scans every database and schema the role can see. On large accounts this is slow and floods the user with irrelevant objects. So FIRST let the user choose where to search — just like they later choose which SVs/agents to govern — then scope the discovery `SHOW` commands to that location.
 
-```sql
-SHOW SEMANTIC VIEWS IN ACCOUNT;
-```
+#### 1a: Enumerate candidate locations
 
-```sql
-SHOW AGENTS IN ACCOUNT;
-```
+Run these first so the user has real choices to pick from:
 
 ```sql
 SHOW DATABASES;
@@ -31,10 +27,56 @@ SHOW DATABASES;
 SHOW WAREHOUSES;
 ```
 
+Build the list of selectable databases from the `SHOW DATABASES` output, excluding Snowflake-managed databases the framework should never scan (`SNOWFLAKE`, `SNOWFLAKE_SAMPLE_DATA`, and any database where `origin` is non-empty / shared inbound, unless the user explicitly wants them).
+
+#### 1b: Ask the user for the search scope
+
+Use `ask_user_question` (type: options, `multiSelect: true`) titled "Search location". Offer:
+
+- **"Entire account (all databases & schemas)"** — the original behavior; warn it may be slow/noisy on large accounts.
+- One option per non-Snowflake database discovered in 1a (label = database name) — lets the user pick one or more databases.
+
+Users can also pick "Something else" to type a specific `DATABASE` or `DATABASE.SCHEMA`.
+
+If the user selects one or more specific databases and wants finer granularity (or the chosen database has many schemas), enumerate schemas and offer them too:
+
+```sql
+SHOW SCHEMAS IN DATABASE <db>;
+```
+
+Then ask (`ask_user_question`, multiSelect) which schema(s) — or "All schemas in this database" — to search within each chosen database. Exclude `INFORMATION_SCHEMA` by default.
+
+#### 1c: Run discovery scoped to the chosen location(s)
+
+Use the NARROWEST scope the user selected. Both `SHOW SEMANTIC VIEWS` and `SHOW AGENTS` accept `IN { ACCOUNT | DATABASE <db> | SCHEMA <db>.<schema> }`.
+
+- **Entire account:**
+  ```sql
+  SHOW SEMANTIC VIEWS IN ACCOUNT;
+  SHOW AGENTS IN ACCOUNT;
+  ```
+- **A specific database:**
+  ```sql
+  SHOW SEMANTIC VIEWS IN DATABASE <db>;
+  SHOW AGENTS IN DATABASE <db>;
+  ```
+- **A specific schema:**
+  ```sql
+  SHOW SEMANTIC VIEWS IN SCHEMA <db>.<schema>;
+  SHOW AGENTS IN SCHEMA <db>.<schema>;
+  ```
+
+If the user chose multiple databases or schemas, run the scoped pair once per location and combine (de-duplicate) the results into a single list of FQNs.
+
+#### 1d: Summarize
+
 Present a summary to the user:
+- The search scope that was used (account / list of databases / list of schemas)
 - Number of semantic views found (list their FQNs)
 - Number of agents found (list their FQNs)
 - Note the current role and whether it's ACCOUNTADMIN (if not, warn that some objects may be hidden)
+
+If the scoped search returns nothing, offer to widen the scope (e.g. fall back to `IN ACCOUNT`) before continuing.
 
 ### Step 2: Select Objects to Govern
 
@@ -372,6 +414,6 @@ Tell the user:
 
 - This skill does NOT create databases, warehouses, or RBAC roles — it uses what already exists.
 - The `prod` environment section is intentionally empty — it's populated later when CI/CD is configured.
-- If `SHOW AGENTS IN ACCOUNT` or `SHOW SEMANTIC VIEWS IN ACCOUNT` returns errors, the running role likely lacks visibility. Suggest the user switch to a role with broader grants or ACCOUNTADMIN.
+- If `SHOW AGENTS` or `SHOW SEMANTIC VIEWS` returns errors or fewer objects than expected, the running role likely lacks visibility, OR the search scope chosen in Step 1 is too narrow. Suggest the user widen the scope (e.g. re-run with `IN ACCOUNT`) and/or switch to a role with broader grants or ACCOUNTADMIN.
 - The framework schema is the ONLY place where new objects are created.
 - All existing customer objects (SVs, agents, data tables) remain untouched.
