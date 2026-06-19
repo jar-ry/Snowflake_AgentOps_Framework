@@ -25,16 +25,18 @@ The framework is built on three complementary pillars. Each doc explains the des
 
 **How the pillars work together:**
 
-```
-Pillar 1 (Input)          Pillar 2 (Output)           Pillar 3 (Runtime)
-─────────────────         ─────────────────           ──────────────────
-Audit SV structure  →     Evaluate with Q-bank  →     Monitor in production
-(free, pre-CI)            (LLM-judged, CI gate)       (free, post-deploy)
-        │                         │                           │
-        └─── catches SV defects   └─── catches wrong answers └─── catches drift
-                                          ↑                           │
-                                          └───── feedback loop ───────┘
-                                          (production failures become CI tests)
+```mermaid
+flowchart LR
+    P1["<b>Pillar 1 — Input</b><br/>Audit SV structure<br/><i>free · pre-CI</i>"]
+    P2["<b>Pillar 2 — Output</b><br/>Evaluate with Q-bank<br/><i>LLM-judged · CI gate</i>"]
+    P3["<b>Pillar 3 — Runtime</b><br/>Monitor in production<br/><i>free · post-deploy</i>"]
+
+    P1 -->|catches SV defects| P2
+    P2 -->|catches wrong answers| P3
+    P3 -.->|"feedback loop — production<br/>failures become CI tests"| P2
+
+    classDef pillar fill:#eef4ff,stroke:#3b6fd4,color:#1a3a6b;
+    class P1,P2,P3 pillar;
 ```
 
 ## Reference

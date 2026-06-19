@@ -16,41 +16,30 @@ A governance framework for **Semantic Views** and **Cortex Agents** in Snowflake
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        DEVELOPMENT WORKFLOW                         │
-│                                                                     │
-│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────────┐  │
-│  │ Snowsight │    │  CoCo /  │    │   Git    │    │    CI/CD     │  │
-│  │  (Edit)   │───▶│  IDE     │───▶│ Commit   │───▶│  Pipeline    │  │
-│  └──────────┘    └──────────┘    └──────────┘    └──────┬───────┘  │
-│                                                          │          │
-│                                                          ▼          │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │                    CI PIPELINE (on PR)                        │   │
-│  │                                                               │   │
-│  │  ┌─────────────────────────────────────────────────────────┐  │   │
-│  │  │ LAYER 1: AUDITS (structural — free, no LLM calls)      │  │   │
-│  │  │  ├─ Documentation completeness                         │  │   │
-│  │  │  ├─ Naming conventions                                 │  │   │
-│  │  │  ├─ Metadata (VALUES, types)                           │  │   │
-│  │  │  ├─ Relationships                                      │  │   │
-│  │  │  └─ Inconsistencies / duplicates                       │  │   │
-│  │  └─────────────────────────────────────────────────────────┘  │   │
-│  │                              │                                 │   │
-│  │                              ▼                                 │   │
-│  │  ┌─────────────────────────────────────────────────────────┐  │   │
-│  │  │ LAYER 2: QUESTION BANK EVALUATION (LLM-judged accuracy) │  │   │
-│  │  │  ├─ Semantic View: easy / hard / ambiguous              │  │   │
-│  │  │  └─ Agent (GPA): answerable / OOS / adversarial         │  │   │
-│  │  └─────────────────────────────────────────────────────────┘  │   │
-│  │                                                               │   │
-│  │  Post results to PR comment → accuracy >= threshold?          │   │
-│  └──────────────────────────────────────────────────────────────┘   │
-│                              │                                      │
-│                    YES → merge → CD deploys to PROD                 │
-│                    NO  → block merge, iterate                       │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph DEV["Development Workflow"]
+        direction LR
+        SS["Snowsight<br/>(edit)"] --> COCO["CoCo / IDE"] --> GIT["Git commit"] --> CICD["CI/CD pipeline"]
+    end
+
+    CICD --> CIPR
+
+    subgraph CIPR["CI Pipeline (on PR)"]
+        direction TB
+        L1["<b>Layer 1 — Audits</b><br/>structural · free · no LLM calls<br/>• Documentation completeness<br/>• Naming conventions<br/>• Metadata (VALUES, types)<br/>• Relationships<br/>• Inconsistencies / duplicates"]
+        L2["<b>Layer 2 — Question Bank Evaluation</b><br/>LLM-judged accuracy<br/>• Semantic View: easy / hard / ambiguous<br/>• Agent (GPA): answerable / OOS / adversarial"]
+        GATE{"Post results to PR comment<br/>accuracy ≥ threshold?"}
+        L1 --> L2 --> GATE
+    end
+
+    GATE -->|YES| MERGE["Merge → CD deploys to PROD"]
+    GATE -->|NO| BLOCK["Block merge, iterate"]
+
+    classDef pass fill:#d4edda,stroke:#28a745,color:#155724;
+    classDef fail fill:#f8d7da,stroke:#dc3545,color:#721c24;
+    class MERGE pass;
+    class BLOCK fail;
 ```
 
 ---
@@ -280,7 +269,9 @@ agent:
 | [ci/README.md](ci/README.md) | Guide | CI/CD pipeline stages + env vars |
 | [docs/README.md](docs/README.md) | Index | Documentation map |
 | [Cost model](docs/reference/cost-model.md) | Reference | Evaluation cost in AI Credits |
-| [Input governance](docs/explanation/pillar-1-input-governance.md) | Explanation | Semantic view audit design |
+| [Pillar 1: Input governance](docs/explanation/pillar-1-input-governance.md) | Explanation | Semantic view audit design |
+| [Pillar 2: Output evaluation](docs/explanation/pillar-2-output-evaluation.md) | Explanation | Question banks, LLM judge, GPA eval, CI gates |
+| [Pillar 3: Runtime monitoring](docs/explanation/pillar-3-runtime-monitoring.md) | Explanation | Interaction-quality engine, alerts, trend views |
 
 ---
 

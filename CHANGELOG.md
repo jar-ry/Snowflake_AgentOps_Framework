@@ -11,12 +11,13 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 
 - Apache License 2.0 (`LICENSE`) and attribution `NOTICE`, making the framework's
   open-source status explicit (#32).
-- Framework / instance split: the domain-agnostic engine lives at the repo root and
-  the retail reference instance moves to `examples/retail/`, with a
-  `config/defaults.yaml` + per-instance config merge resolved via `AIOPS_INSTANCE`
-  (#27, #36, #38).
-- Instance-agnostic CI: the active instance is derived from the changed paths in a
-  PR, and CI also triggers on framework changes under `evaluation/**` (#39, #41).
+- Framework-only repo: the domain-agnostic engine lives at the repo root, and users
+  point it at their own existing objects (tracked under `agents/` and `semantic_views/`)
+  via `config/environments.yaml`, with a `config/defaults.yaml` + per-instance config
+  merge (#27, #36, #38).
+- Instance-agnostic CI: evaluations trigger on changes to the watched paths
+  (`agents/**`, `semantic_views/**`, `question_banks/**`, `config/**`, `evaluation/**`)
+  (#39, #41).
 - Diátaxis `docs/` tree, including the canonical cost model and the Pillar 1
   (input governance) explanation (#24).
 
@@ -35,7 +36,8 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
   a Cortex Analyst response-shape mismatch in the SQL extractor (#37, #40).
 - `audit_agent.py`: fail-fast on errors, percentage-based output, and stale-dataset
   detection (#16).
-- `bootstrap.py`: state-tracking SQL splitter (handles `BEGIN…END` blocks and quoted
+- Interactive bootstrap via the `.cortex/skills/bootstrap-from-existing` Cortex Code
+  skill: a state-tracking SQL splitter (handles `BEGIN…END` blocks and quoted
   semicolons) and clean observability view setup (#17).
 
 ## [v1] - 2026-04-30
@@ -59,5 +61,5 @@ Initial reference implementation.
 - Streamlit-in-Snowflake monitoring dashboard (evaluations, interaction quality,
   feedback, token costs, alerts).
 
-[Unreleased]: https://github.com/jar-ry/snowflake_AIOps_framework/compare/v1...HEAD
-[v1]: https://github.com/jar-ry/snowflake_AIOps_framework/releases/tag/v1
+[Unreleased]: https://github.com/jar-ry/Snowflake_AgentOps_Framework/compare/v1...HEAD
+[v1]: https://github.com/jar-ry/Snowflake_AgentOps_Framework/releases/tag/v1

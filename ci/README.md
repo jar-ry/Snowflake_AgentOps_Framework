@@ -28,7 +28,7 @@ python evaluation/evaluate_semantic_view.py --environment dev --semantic-view DB
 python evaluation/audit_agent.py --environment dev --agent-name DB.SCHEMA.MY_AGENT
 ```
 - Uses Snowflake's native `EXECUTE_AI_EVALUATION` with built-in GPA metrics
-- Scores: answer_correctness, logical_consistency, safety, groundedness, execution_efficiency
+- Scores up to 8 metrics by default — built-in (`answer_correctness`, `logical_consistency`) plus custom LLM-judged (`safety`, `groundedness`, `execution_efficiency`, `answer_relevance`, `conciseness`, `pii_leakage`). The active set is configurable per environment via `thresholds.yaml` (`agent.<env>.metrics`); see [docs/explanation/pillar-2-output-evaluation.md](../docs/explanation/pillar-2-output-evaluation.md).
 - **Gate**: Must exceed per-metric thresholds
 
 ### Stage 4: Deploy (Promote to production)

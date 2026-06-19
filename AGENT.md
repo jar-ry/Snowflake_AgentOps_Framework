@@ -46,7 +46,10 @@ Everything the framework creates lives in `{{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}
 ```
 Snowflake_AgentOps_Framework/
 ├── .cortex/skills/
-│   └── bootstrap-from-existing.md    # Interactive bootstrap
+│   └── bootstrap-from-existing/        # Interactive bootstrap skill
+│       └── SKILL.md                    # Skill definition (/skill add)
+├── agents/                             # Agent specs under governance
+├── semantic_views/                     # Semantic view definitions under governance
 ├── app/                                # App Runtime dashboard (Next.js)
 ├── ci/                                 # CI/CD — vendor-neutral
 │   ├── README.md                      # Pipeline stages & wiring guide
@@ -71,7 +74,12 @@ Snowflake_AgentOps_Framework/
 ├── setup/
 │   ├── 00_framework_tables.sql        # All framework SQL objects
 │   └── deploy.py                      # Deploy helper (CI)
-└── docs/                              # Reference & explanation
+├── docs/                              # Reference & explanation
+├── LICENSE
+├── NOTICE
+├── CHANGELOG.md
+├── CONTRIBUTING.md
+└── README.md
 ```
 
 ## Key Technical Patterns
