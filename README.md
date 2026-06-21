@@ -171,13 +171,3 @@ Quality gates are configured per environment in `config/thresholds.yaml` — per
 | [Pillar 1: Input governance](docs/explanation/pillar-1-input-governance.md) | Explanation | Semantic view audit design |
 | [Pillar 2: Output evaluation](docs/explanation/pillar-2-output-evaluation.md) | Explanation | Question banks, LLM judge, GPA eval, CI gates |
 | [Pillar 3: Runtime monitoring](docs/explanation/pillar-3-runtime-monitoring.md) | Explanation | Interaction-quality engine, alerts, trend views |
-
----
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch → PR → merge workflow.
-
-## License
-
-Licensed under the [Apache License 2.0](LICENSE) (see also [NOTICE](NOTICE)).

@@ -66,10 +66,6 @@ Snowflake_AgentOps_Framework/
 │   ├── 00_framework_tables.sql        # All framework SQL objects
 │   └── deploy.py                      # Deploy helper (CI)
 ├── docs/                              # Reference & explanation
-├── LICENSE
-├── NOTICE
-├── CHANGELOG.md
-├── CONTRIBUTING.md
 └── README.md
 ```
 
