@@ -1,6 +1,6 @@
-# Snowflake AgentOps Framework - Agent Instructions
+# Snowflake AgentOps Framework — agent instructions
 
-## Project Overview
+## Project overview
 
 This is a governance framework for **Semantic Views** and **Cortex Agents** in Snowflake. Users clone the repo, bootstrap from their existing environment, and get CI/CD quality gates + monitoring — without creating new databases, RBAC roles, or data tables.
 
@@ -16,18 +16,9 @@ The repo contains the **framework only**. Users point it at their existing objec
 - YAML for configuration (environments, thresholds, question banks)
 - CI/CD is vendor-neutral (see `ci/README.md`)
 
-## Snowflake Environment
+## Snowflake environment
 
-The framework creates its tables/views/alerts/tasks in a **single user-provided schema** (configured in `config/environments.yaml`):
-
-```yaml
-framework:
-  database: CUSTOMER_OPS     # existing database
-  schema: AGENTOPS           # created by the framework
-  warehouse: COMPUTE_WH     # existing warehouse
-```
-
-Everything the framework creates lives in `{{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}`. It does NOT create databases, warehouses, or RBAC roles.
+The framework creates its tables, views, alerts, and tasks in a **single user-provided schema** (`{{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}`, configured in `config/environments.yaml`). It does NOT create databases, warehouses, or RBAC roles.
 
 ### What the framework creates (in the framework schema)
 
@@ -41,7 +32,7 @@ Everything the framework creates lives in `{{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}
 | Alerts | 7 alerts (feedback, accuracy, latency, cost, error, health, quality) |
 | Tasks | 3 tasks (daily usage, daily feedback, daily quality) |
 
-## Directory Structure
+## Directory structure
 
 ```
 Snowflake_AgentOps_Framework/
@@ -82,26 +73,24 @@ Snowflake_AgentOps_Framework/
 └── README.md
 ```
 
-## Key Technical Patterns
+## Key technical patterns
 
-### Config Resolution
+### Configuration
 
-Config lives in `config/environments.yaml` (populated during bootstrap). The `evaluation/utils.py` module loads it and merges with `config/defaults.yaml`. All paths resolve relative to repo root.
+`evaluation/utils.py` loads `config/environments.yaml` (populated during bootstrap) and merges it with `config/defaults.yaml`. All paths resolve relative to repo root.
 
-- `config/defaults.yaml` — Universal: LLM models + per-model credit pricing
-- `config/environments.yaml` — Your framework DB, agents, semantic views
-- `config/thresholds.yaml` — Graduated accuracy thresholds
-- `config/monitoring.yaml` — Alert thresholds
-
-### Config Format (environments.yaml)
+- `config/defaults.yaml` — platform-wide: LLM models + per-model credit pricing
+- `config/environments.yaml` — your framework DB, agents, semantic views
+- `config/thresholds.yaml` — graduated accuracy thresholds (quality gates)
+- `config/monitoring.yaml` — alert thresholds
 
 ```yaml
 connection_name: MY_CONNECTION
 
 framework:
-  database: MY_DB
-  schema: AGENTOPS
-  warehouse: MY_WH
+  database: MY_DB        # existing database
+  schema: AGENTOPS       # created by the framework (the only schema it creates)
+  warehouse: MY_WH       # existing warehouse
 
 environments:
   dev:
@@ -128,18 +117,16 @@ question_banks:
 - Key span names: `ReasoningAgentStepPlanning-N`, `CodingAgent.Step-N`
 - Token fields: `snow.ai.observability.agent.planning.token_count.{input,output,total,cache_read_input}`
 
-### Evaluation Pipeline (Two Layers)
+### Evaluation pipeline
 
-**Layer 1 — Audits (free, no LLM calls):**
-- `audit_semantic_view.py`: Parses YAML or live SV, checks documentation, naming, metadata, relationships.
+Two CI layers — Layer 1 maps to Pillar 1 (input governance), Layer 2 to Pillar 2 (output evaluation); runtime monitoring is Pillar 3. See [docs/](docs/README.md) for the pillar explanations.
 
-**Layer 2 — Question Bank Evaluation (LLM-judged):**
-- `evaluate_semantic_view.py`: Calls Cortex Analyst, compares SQL results, uses LLM judge.
-- `audit_agent.py`: Uses Snowflake's native `EXECUTE_AI_EVALUATION` with GPA metrics.
+- **Layer 1 — audits (free, no LLM calls):** `audit_semantic_view.py` parses YAML or a live SV and checks documentation, naming, metadata, and relationships.
+- **Layer 2 — evaluation (LLM-judged):** `evaluate_semantic_view.py` (Cortex Analyst + SQL result compare + LLM judge); `audit_agent.py` (native `EXECUTE_AI_EVALUATION` with GPA metrics).
 
-### Connection Pattern
+### Connection pattern
 
-Python scripts connect via named connection (from `config/environments.yaml`) or env vars:
+Python scripts connect via a named connection (from `config/environments.yaml`) or env vars:
 ```python
 # CI (headless): SNOWFLAKE_ACCOUNT + SNOWFLAKE_USER + SNOWFLAKE_PRIVATE_KEY
 # Local: connection_name from config resolves via ~/.snowflake/connections.toml
@@ -147,9 +134,4 @@ Python scripts connect via named connection (from `config/environments.yaml`) or
 
 ### CI/CD
 
-See `ci/README.md`. Pipeline stages:
-1. Audit (structural, free)
-2. Evaluate (LLM-judged accuracy)
-3. Deploy (promote to prod)
-
-GitHub Actions examples in `ci/github/`. Portable to any CI system.
+Vendor-neutral; stages are Audit → Evaluate → Deploy. See [ci/README.md](ci/README.md) for full wiring and the GitHub Actions examples in `ci/github/`.

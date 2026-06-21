@@ -1,6 +1,6 @@
 # Documentation
 
-> Status: Stable | Last reviewed: 2026-06-08 | Audience: Engineers, solution architects, customers
+> Status: Stable | Last reviewed: 2026-06-21 | Audience: Engineers, solution architects, customers
 
 **Purpose.** This is the documentation map for the Snowflake AgentOps Framework. It is organized using the [Diataxis](https://diataxis.fr/) framework, which separates documentation by what the reader needs.
 
@@ -14,15 +14,15 @@
 
 The root [README](../README.md) is the project entry point and getting-started guide. The [ci/README](../ci/README.md) covers CI/CD pipeline wiring. This `docs/` tree holds deeper reference and explanation material.
 
-## Explanation — The Three Pillars
+## Explanation — the three pillars
 
 The framework is built on three complementary pillars. Each doc explains the design philosophy, what the pillar does today, and where it is headed:
 
-1. [Pillar 1: Input Governance](explanation/pillar-1-input-governance.md) — Audit the semantic view (the agent's input) for structural defects before the agent ever runs. Free, deterministic, domain-agnostic today; AI-generated domain-aware rules on the roadmap.
+1. [Pillar 1: Input governance](explanation/pillar-1-input-governance.md) — Audit the semantic view (the agent's input) for structural defects before the agent ever runs. Free, deterministic, domain-agnostic today; AI-generated domain-aware rules on the roadmap.
 
-2. [Pillar 2: Output Evaluation](explanation/pillar-2-output-evaluation.md) — Test agent outputs using question banks, LLM-as-a-judge, and Snowflake's native GPA evaluation. CI quality gates prevent regressions from reaching production.
+2. [Pillar 2: Output evaluation](explanation/pillar-2-output-evaluation.md) — Test agent outputs using question banks, LLM-as-a-judge, and Snowflake's native GPA evaluation. CI quality gates prevent regressions from reaching production.
 
-3. [Pillar 3: Runtime Monitoring](explanation/pillar-3-runtime-monitoring.md) — Monitor agents in production with rules-based interaction quality detection, alerts, and trend analytics — all from native observability events at near-zero cost.
+3. [Pillar 3: Runtime monitoring](explanation/pillar-3-runtime-monitoring.md) — Monitor agents in production with rules-based interaction quality detection, alerts, and trend analytics — all from native observability events at near-zero cost.
 
 **How the pillars work together:**
 

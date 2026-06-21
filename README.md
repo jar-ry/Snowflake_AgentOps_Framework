@@ -4,7 +4,7 @@ A governance framework for **Semantic Views** and **Cortex Agents** in Snowflake
 
 ---
 
-## What This Does
+## What this does
 
 1. **Discovers** your existing semantic views and agents
 2. **Evaluates** them with question banks + LLM-as-a-judge
@@ -44,7 +44,7 @@ flowchart TB
 
 ---
 
-## Getting Started
+## Getting started
 
 ### Prerequisites
 
@@ -54,7 +54,7 @@ flowchart TB
 - A named connection in `~/.snowflake/connections.toml`
 - [Cortex Code](https://docs.snowflake.com/en/user-guide/cortex-code) (recommended)
 
-### Bootstrap with Cortex Code (Recommended)
+### Bootstrap with Cortex Code (recommended)
 
 The framework ships a bundled Cortex Code skill at `.cortex/skills/bootstrap-from-existing/`. Cortex Code does not auto-discover skills bundled in a repo, so you register it once per clone, then invoke it.
 
@@ -79,7 +79,7 @@ The skill will:
 5. Execute the setup SQL to create framework objects
 6. Seed starter question banks from your semantic view structure
 
-### Manual Setup
+### Manual setup
 
 1. Install dependencies:
 ```bash
@@ -101,7 +101,7 @@ cp config/monitoring.yaml.template config/monitoring.yaml
 
 ---
 
-## Directory Structure
+## Directory structure
 
 ```
 Snowflake_AgentOps_Framework/
@@ -121,17 +121,17 @@ For the full file-by-file layout, see [AGENT.md](AGENT.md).
 
 ---
 
-## Run Evaluations Locally
+## Run evaluations locally
 
 You can run audits, evaluations, question-bank generation, and health checks from the command line against any configured environment. See [How-to: Run evaluations locally](docs/how-to/run-evaluations-locally.md) for the full command reference.
 
 ---
 
-## Monitoring & Observability
+## Monitoring & observability
 
 The framework creates tables, views, alerts, and tasks in your chosen schema (see `setup/00_framework_tables.sql`). Three daily tasks aggregate usage, feedback, and interaction-quality data, and seven Snowflake Alerts fire on regressions — feedback spikes, accuracy drops, latency degradation, cost anomalies, error spikes, health failures, and interaction-quality issues. See [Pillar 3: Runtime monitoring](docs/explanation/pillar-3-runtime-monitoring.md) for the full task schedule, alert thresholds, and severity logic.
 
-### Monitoring Dashboard (App Runtime)
+### Monitoring dashboard (App Runtime)
 
 Deploy the Next.js dashboard to Snowflake:
 
@@ -143,7 +143,7 @@ The dashboard shows: KPIs, accuracy trends, interaction quality flags, token cos
 
 ---
 
-## CI/CD Pipeline
+## CI/CD pipeline
 
 See [ci/README.md](ci/README.md) for full documentation on pipeline stages and how to wire them into GitHub Actions, GitLab CI, Azure DevOps, or any other CI system.
 
@@ -154,7 +154,7 @@ See [ci/README.md](ci/README.md) for full documentation on pipeline stages and h
 
 ---
 
-## Configuring Thresholds
+## Configuring thresholds
 
 Quality gates are configured per environment in `config/thresholds.yaml` — permissive on DEV (lets developers iterate) and strict on PROD (protects production quality). See [Pillar 2: Output evaluation](docs/explanation/pillar-2-output-evaluation.md#quality-gates-in-ci) for the threshold model and a worked example.
 

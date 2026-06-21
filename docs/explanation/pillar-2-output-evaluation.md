@@ -1,6 +1,6 @@
 # Pillar 2: Output Evaluation
 
-> Status: Stable | Last reviewed: 2026-06-08 | Audience: Engineers, solution architects, customers
+> Status: Stable | Last reviewed: 2026-06-21 | Audience: Engineers, solution architects, customers
 
 **Purpose.** Explain how the framework evaluates the quality of agent and semantic view outputs using question banks, LLM-as-a-judge, and Snowflake's native GPA evaluation — and how these gates prevent regressions from reaching production.
 
@@ -12,7 +12,7 @@ The premise: a semantic view can pass all structural checks and still produce wr
 
 ## Two evaluation paths
 
-### Semantic View Evaluation (`evaluate_semantic_view.py`)
+### Semantic view evaluation (`evaluate_semantic_view.py`)
 
 Tests the text-to-SQL pipeline directly:
 
@@ -38,7 +38,7 @@ The evaluator:
 | Hard | Multi-table joins, complex filters, edge cases | SQL result comparison + LLM judge | 75% |
 | Ambiguous | Questions with multiple valid interpretations | LLM-as-a-Judge only (semantic similarity) | 60% |
 
-### Agent Evaluation (`audit_agent.py`)
+### Agent evaluation (`audit_agent.py`)
 
 Tests the full agent orchestration using Snowflake's native `EXECUTE_AI_EVALUATION` with the GPA (Grounded Performance Assessment) framework:
 
