@@ -14,7 +14,7 @@ The repo contains the **framework only**. Users point it at their existing objec
 - All SQL follows Snowflake SQL syntax
 - Python scripts use `snowflake-connector-python` via named connections
 - YAML for configuration (environments, thresholds, question banks)
-- CI/CD is vendor-neutral (see `ci/README.md`)
+- CI/CD is vendor-neutral (see `docs/how-to/set-up-ci-cd.md`)
 
 ## Snowflake environment
 
@@ -42,8 +42,6 @@ Snowflake_AgentOps_Framework/
 ├── agents/                             # Agent specs under governance
 ├── semantic_views/                     # Semantic view definitions under governance
 ├── app/                                # App Runtime dashboard (Next.js)
-├── ci/                                 # CI/CD — vendor-neutral
-│   └── README.md                      # Pipeline stages & wiring guide
 ├── config/                             # All configuration
 │   ├── defaults.yaml                  # LLM models + credit pricing
 │   ├── environments.yaml.template     # Instance config template
@@ -129,4 +127,4 @@ Python scripts connect via a named connection (from `config/environments.yaml`) 
 
 ### CI/CD
 
-Vendor-neutral; stages are Audit → Evaluate → Deploy. See [ci/README.md](ci/README.md) for full wiring; the repo's own workflows live in `.github/workflows/`.
+Vendor-neutral; stages are Audit → Evaluate → Deploy. See [docs/how-to/set-up-ci-cd.md](docs/how-to/set-up-ci-cd.md) for full wiring; the repo's own workflows live in `.github/workflows/`.

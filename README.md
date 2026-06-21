@@ -112,9 +112,8 @@ Snowflake_AgentOps_Framework/
 ├── evaluation/          # Evaluation + monitoring Python (audits, judge, health, cost)
 ├── setup/               # Framework SQL objects + deploy helper
 ├── config/              # Configuration (environments, thresholds, monitoring, defaults)
-├── ci/                  # Vendor-neutral CI/CD pipeline docs
 ├── app/                 # App Runtime monitoring dashboard (Next.js)
-└── docs/                # Reference & explanation docs
+└── docs/                # Reference, how-to & explanation docs
 ```
 
 For the full file-by-file layout, see [AGENT.md](AGENT.md).
@@ -145,7 +144,7 @@ The dashboard shows: KPIs, accuracy trends, interaction quality flags, token cos
 
 ## CI/CD pipeline
 
-See [ci/README.md](ci/README.md) for full documentation on pipeline stages and how to wire them into GitHub Actions, GitLab CI, Azure DevOps, or any other CI system.
+See [Set up CI/CD](docs/how-to/set-up-ci-cd.md) for full documentation on pipeline stages and how to wire them into GitHub Actions, GitLab CI, Azure DevOps, or any other CI system.
 
 **Pipeline stages:**
 1. **Audit** — structural checks (free)
@@ -164,9 +163,9 @@ Quality gates are configured per environment in `config/thresholds.yaml` — per
 
 | Document | Type | What it covers |
 |----------|------|----------------|
-| [ci/README.md](ci/README.md) | Guide | CI/CD pipeline stages + env vars |
-| [docs/README.md](docs/README.md) | Index | Documentation map |
+| [Set up CI/CD](docs/how-to/set-up-ci-cd.md) | How-to | Pipeline stages, env vars, wiring into any CI |
 | [Run evaluations locally](docs/how-to/run-evaluations-locally.md) | How-to | CLI commands for audits, evals, and health checks |
+| [docs/README.md](docs/README.md) | Index | Documentation map |
 | [Cost model](docs/reference/cost-model.md) | Reference | Evaluation cost in AI Credits |
 | [Pillar 1: Input governance](docs/explanation/pillar-1-input-governance.md) | Explanation | Semantic view audit design |
 | [Pillar 2: Output evaluation](docs/explanation/pillar-2-output-evaluation.md) | Explanation | Question banks, LLM judge, GPA eval, CI gates |

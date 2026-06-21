@@ -36,4 +36,4 @@ python evaluation/health_check.py --environment dev
 
 - `--environment` selects the block under `environments:` in `config/environments.yaml` (for example `dev` or `prod`).
 - The audit (`audit_semantic_view.py`) makes no LLM calls and is free; the evaluation scripts consume Snowflake AI Credits. See [the cost model](../reference/cost-model.md) before running large question banks.
-- These are the same scripts wired into CI — see [ci/README.md](../../ci/README.md) for the pipeline stages.
+- These are the same scripts wired into CI — see [Set up CI/CD](set-up-ci-cd.md) for the pipeline stages.

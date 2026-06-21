@@ -32,7 +32,7 @@ python evaluation/evaluate_semantic_view.py --environment dev --semantic-view DB
 python evaluation/audit_agent.py --environment dev --agent-name DB.SCHEMA.MY_AGENT
 ```
 - Uses Snowflake's native `EXECUTE_AI_EVALUATION` with built-in GPA metrics
-- Scores up to 8 metrics by default — built-in (`answer_correctness`, `logical_consistency`) plus custom LLM-judged (`safety`, `groundedness`, `execution_efficiency`, `answer_relevance`, `conciseness`, `pii_leakage`). The active set is configurable per environment via `thresholds.yaml` (`agent.<env>.metrics`); see [docs/explanation/pillar-2-output-evaluation.md](../docs/explanation/pillar-2-output-evaluation.md).
+- Scores up to 8 metrics by default — built-in (`answer_correctness`, `logical_consistency`) plus custom LLM-judged (`safety`, `groundedness`, `execution_efficiency`, `answer_relevance`, `conciseness`, `pii_leakage`). The active set is configurable per environment via `thresholds.yaml` (`agent.<env>.metrics`); see [Pillar 2: Output evaluation](../explanation/pillar-2-output-evaluation.md).
 - **Gate**: Must exceed per-metric thresholds
 
 ### Stage 4: Deploy (promote to production)
@@ -54,7 +54,7 @@ The scripts above are the interface. Your CI system just needs to:
 4. Run the scripts in order, failing the pipeline if any exit non-zero
 
 ### GitHub Actions
-This repo's own workflows in [`.github/workflows/`](../.github/workflows/) are the reference implementation — `agent_ci.yml`, `agent_cd.yml`, `semantic_view_ci.yml`, and `semantic_view_cd.yml`. Adapt them in place, or copy them into your own repo.
+This repo's own workflows in [`.github/workflows/`](../../.github/workflows/) are the reference implementation — `agent_ci.yml`, `agent_cd.yml`, `semantic_view_ci.yml`, and `semantic_view_cd.yml`. Adapt them in place, or copy them into your own repo.
 
 ### GitLab CI
 ```yaml

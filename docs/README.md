@@ -12,7 +12,7 @@
 | Reference | `reference/` | "What are the exact details?" | You need precise, lookup-style information |
 | Explanation | `explanation/` | "Why does it work this way?" | You want to understand the design and tradeoffs |
 
-The root [README](../README.md) is the project entry point and getting-started guide. The [ci/README](../ci/README.md) covers CI/CD pipeline wiring. This `docs/` tree holds deeper reference and explanation material.
+The root [README](../README.md) is the project entry point and getting-started guide. This `docs/` tree holds the how-to, reference, and explanation material.
 
 ## Explanation — the three pillars
 
@@ -45,6 +45,7 @@ flowchart LR
 Task-oriented, step-by-step guides.
 
 - [Run evaluations locally](how-to/run-evaluations-locally.md) — CLI commands for audits, evaluations, question-bank generation, and health checks against a configured environment.
+- [Set up CI/CD](how-to/set-up-ci-cd.md) — pipeline stages, environment variables, and how to wire them into GitHub Actions, GitLab CI, Azure DevOps, or any other CI system.
 
 ## Reference
 
