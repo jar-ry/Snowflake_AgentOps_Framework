@@ -1,6 +1,6 @@
 # Pillar 3: Runtime Monitoring
 
-> Status: Stable | Last reviewed: 2026-06-08 | Audience: Engineers, solution architects, customers
+> Status: Stable | Last reviewed: 2026-06-21 | Audience: Engineers, solution architects, customers
 
 **Purpose.** Explain how the framework monitors agents in production — tracking cost, latency, interaction quality, and user satisfaction — and how alerts surface regressions that CI evaluation alone cannot catch.
 
@@ -82,7 +82,7 @@ Seven Snowflake Alerts fire when monitoring thresholds are breached. Each insert
 | Health Failure | Any health check UNHEALTHY | Always CRITICAL |
 | Interaction Quality | >20% flagged requests OR any critical flags | CRITICAL if critical flags present |
 
-### Alert → Action loop
+### Alert → action loop
 
 The dashboard shows each alert with a tooltip explaining:
 1. What caused it

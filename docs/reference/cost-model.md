@@ -23,6 +23,8 @@ The framework has two evaluation loops with very different cost characteristics:
 
 Loop 2 is pure SQL aggregation on an XSMALL warehouse running short daily tasks. Its cost is negligible and not modeled here. The rest of this document is about Loop 1.
 
+> These two loops map onto the [three pillars](../README.md#explanation--the-three-pillars): Loop 1 is **Pillar 2** (output evaluation); Loop 2 is **Pillar 3** (runtime monitoring). **Pillar 1** (input governance) is a free, pre-CI structural audit that makes no LLM calls, so it is not modeled here either.
+
 ## How Loop 1 cost is computed
 
 For each evaluation run, the framework:
@@ -34,7 +36,7 @@ So a single question with `M` metrics costs: one agent invocation plus `M` judge
 
 ### Token assumptions (measured)
 
-These figures are **calibrated against real eval runs**, not guessed. The agent values are measured medians from `OBSERVABILITY.AGENT_TRACES` (the `sample` in [config/defaults.yaml](../../config/defaults.yaml) `token_assumptions:`); the judge values remain estimates because judge tokens are not exposed in observability. Always prefer measured actuals (see "Measuring actuals") over any planning figure.
+These figures are **calibrated against real eval runs**, not guessed. The agent values are measured medians from the framework's `AGENT_TRACES` view (the `sample` in [config/defaults.yaml](../../config/defaults.yaml) `token_assumptions:`); the judge values remain estimates because judge tokens are not exposed in observability. Always prefer measured actuals (see "Measuring actuals") over any planning figure.
 
 | Component | Input tokens | Cache-read input | Output tokens | Source |
 | --- | --- | --- | --- | --- |
@@ -67,7 +69,7 @@ Using the measured agent profile above with `claude-opus-4-7` and the default ei
 
 ## Lifecycle cost formula
 
-An evaluation runs on every CI trigger that touches a watched path (`examples/retail/agents/`, `examples/retail/semantic_views/`, `examples/retail/question_banks/`). Across a feature's life:
+An evaluation runs on every CI trigger that touches a watched path (`agents/`, `semantic_views/`, `question_banks/`, `config/`, `evaluation/`). Across a feature's life:
 
 ```text
 E = number of promotion environments (e.g. DEV + STAGING + PROD = 3)
@@ -125,7 +127,7 @@ Estimates are for planning. To see real cost, query the monitoring schema, which
 
 ```sql
 SELECT metric_date, service_type, agent_or_sv_name, total_tokens, estimated_credits
-FROM RETAIL_AI_EVAL.MONITORING.USAGE_METRICS
+FROM {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.USAGE_METRICS
 ORDER BY metric_date DESC;
 ```
 
@@ -133,10 +135,10 @@ The dashboard's Token Costs tab visualizes the same data over time.
 
 ## Reconciling estimates against actuals
 
-Estimates (token assumptions + per-token rates) drift. To catch this, [monitoring/cost_reconcile.py](../../monitoring/cost_reconcile.py) compares the framework's modeled `estimated_credits` (from `USAGE_METRICS`) against ground-truth account AI spend (`SNOWFLAKE.ACCOUNT_USAGE.METERING_DAILY_HISTORY`, `service_type = 'AI_SERVICES'`) over a window and flags when the estimate materially exceeds actuals (over-charging):
+Estimates (token assumptions + per-token rates) drift. To catch this, [evaluation/cost_reconcile.py](../../evaluation/cost_reconcile.py) compares the framework's modeled `estimated_credits` (from `USAGE_METRICS`) against ground-truth account AI spend (`SNOWFLAKE.ACCOUNT_USAGE.METERING_DAILY_HISTORY`, `service_type = 'AI_SERVICES'`) over a window and flags when the estimate materially exceeds actuals (over-charging):
 
 ```bash
-python monitoring/cost_reconcile.py --environment dev --days 30
+python evaluation/cost_reconcile.py --environment dev --days 30
 ```
 
 The actual figure is broader than the estimate (it also includes judge calls and any other Cortex usage), so a healthy state is `estimated <= actual`. Reading the metering view requires `IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE`, so run this as an admin role (it is not part of the deployer CI path).

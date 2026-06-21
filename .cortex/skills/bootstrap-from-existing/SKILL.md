@@ -407,7 +407,7 @@ Tell the user:
 2. Review thresholds in `config/thresholds.yaml` — tune the DEV/PROD accuracy gates to your standards
 3. Run a first evaluation: `python evaluation/evaluate_semantic_view.py --environment dev`
 4. Run an audit: `python evaluation/audit_semantic_view.py --environment dev --live --semantic-view DB.SCHEMA.MY_SV`
-5. (Optional) Set up CI/CD — see `ci/README.md`
+5. (Optional) Set up CI/CD — see `docs/how-to/set-up-ci-cd.md`
 6. (Optional) Deploy the monitoring dashboard: `cd app && snow app setup && snow app deploy`
 
 ## Important Notes

@@ -4,7 +4,7 @@ A governance framework for **Semantic Views** and **Cortex Agents** in Snowflake
 
 ---
 
-## What This Does
+## What this does
 
 1. **Discovers** your existing semantic views and agents
 2. **Evaluates** them with question banks + LLM-as-a-judge
@@ -16,46 +16,35 @@ A governance framework for **Semantic Views** and **Cortex Agents** in Snowflake
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        DEVELOPMENT WORKFLOW                         │
-│                                                                     │
-│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────────┐  │
-│  │ Snowsight │    │  CoCo /  │    │   Git    │    │    CI/CD     │  │
-│  │  (Edit)   │───▶│  IDE     │───▶│ Commit   │───▶│  Pipeline    │  │
-│  └──────────┘    └──────────┘    └──────────┘    └──────┬───────┘  │
-│                                                          │          │
-│                                                          ▼          │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │                    CI PIPELINE (on PR)                        │   │
-│  │                                                               │   │
-│  │  ┌─────────────────────────────────────────────────────────┐  │   │
-│  │  │ LAYER 1: AUDITS (structural — free, no LLM calls)      │  │   │
-│  │  │  ├─ Documentation completeness                         │  │   │
-│  │  │  ├─ Naming conventions                                 │  │   │
-│  │  │  ├─ Metadata (VALUES, types)                           │  │   │
-│  │  │  ├─ Relationships                                      │  │   │
-│  │  │  └─ Inconsistencies / duplicates                       │  │   │
-│  │  └─────────────────────────────────────────────────────────┘  │   │
-│  │                              │                                 │   │
-│  │                              ▼                                 │   │
-│  │  ┌─────────────────────────────────────────────────────────┐  │   │
-│  │  │ LAYER 2: QUESTION BANK EVALUATION (LLM-judged accuracy) │  │   │
-│  │  │  ├─ Semantic View: easy / hard / ambiguous              │  │   │
-│  │  │  └─ Agent (GPA): answerable / OOS / adversarial         │  │   │
-│  │  └─────────────────────────────────────────────────────────┘  │   │
-│  │                                                               │   │
-│  │  Post results to PR comment → accuracy >= threshold?          │   │
-│  └──────────────────────────────────────────────────────────────┘   │
-│                              │                                      │
-│                    YES → merge → CD deploys to PROD                 │
-│                    NO  → block merge, iterate                       │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph DEV["Development Workflow"]
+        direction LR
+        SS["Snowsight<br/>(edit)"] --> COCO["CoCo / IDE"] --> GIT["Git commit"] --> CICD["CI/CD pipeline"]
+    end
+
+    CICD --> CIPR
+
+    subgraph CIPR["CI Pipeline (on PR)"]
+        direction TB
+        L1["<b>Layer 1 — Audits</b><br/>structural · free · no LLM calls<br/>• Documentation completeness<br/>• Naming conventions<br/>• Metadata (VALUES, types)<br/>• Relationships<br/>• Inconsistencies / duplicates"]
+        L2["<b>Layer 2 — Question Bank Evaluation</b><br/>LLM-judged accuracy<br/>• Semantic View: easy / hard / ambiguous<br/>• Agent (GPA): answerable / OOS / adversarial"]
+        GATE{"Post results to PR comment<br/>accuracy ≥ threshold?"}
+        L1 --> L2 --> GATE
+    end
+
+    GATE -->|YES| MERGE["Merge → CD deploys to PROD"]
+    GATE -->|NO| BLOCK["Block merge, iterate"]
+
+    classDef pass fill:#d4edda,stroke:#28a745,color:#155724;
+    classDef fail fill:#f8d7da,stroke:#dc3545,color:#721c24;
+    class MERGE pass;
+    class BLOCK fail;
 ```
 
 ---
 
-## Getting Started
+## Getting started
 
 ### Prerequisites
 
@@ -65,7 +54,7 @@ A governance framework for **Semantic Views** and **Cortex Agents** in Snowflake
 - A named connection in `~/.snowflake/connections.toml`
 - [Cortex Code](https://docs.snowflake.com/en/user-guide/cortex-code) (recommended)
 
-### Bootstrap with Cortex Code (Recommended)
+### Bootstrap with Cortex Code (recommended)
 
 The framework ships a bundled Cortex Code skill at `.cortex/skills/bootstrap-from-existing/`. Cortex Code does not auto-discover skills bundled in a repo, so you register it once per clone, then invoke it.
 
@@ -90,7 +79,7 @@ The skill will:
 5. Execute the setup SQL to create framework objects
 6. Seed starter question banks from your semantic view structure
 
-### Manual Setup
+### Manual setup
 
 1. Install dependencies:
 ```bash
@@ -106,131 +95,42 @@ cp config/monitoring.yaml.template config/monitoring.yaml
 
 3. Edit `config/environments.yaml` — fill in your semantic view FQNs, agent FQNs, and framework DB/schema.
 
-4. Execute the setup SQL:
-```bash
-# Replace placeholders and run against your Snowflake account
-# The bootstrap skill does this automatically — or run manually:
-python -c "
-sql = open('setup/00_framework_tables.sql').read()
-sql = sql.replace('{{FRAMEWORK_DB}}', 'YOUR_DB')
-sql = sql.replace('{{FRAMEWORK_SCHEMA}}', 'AGENTOPS')
-sql = sql.replace('{{WAREHOUSE}}', 'YOUR_WH')
-# Execute each statement...
-"
-```
+4. Create the framework objects. `setup/00_framework_tables.sql` contains three placeholders — `{{FRAMEWORK_DB}}`, `{{FRAMEWORK_SCHEMA}}`, and `{{WAREHOUSE}}`. Substitute your values and run the script against your account (via a Snowsight worksheet, `snow sql`, or the Python connector). The bootstrap skill above performs this substitution and execution for you.
 
 5. Create question banks in `question_banks/` and run your first evaluation.
 
 ---
 
-## Directory Structure
+## Directory structure
 
 ```
 Snowflake_AgentOps_Framework/
-├── .cortex/skills/                     # Cortex Code skills
-│   └── bootstrap-from-existing/        # Interactive bootstrap from existing env
-│       └── SKILL.md                    # Skill definition (register with /skill add)
-├── app/                                # App Runtime monitoring dashboard (Next.js)
-│   ├── app.yml                        # App Runtime manifest
-│   ├── package.json
-│   ├── app/                           # Next.js pages
-│   │   ├── layout.tsx                 # Nav + layout
-│   │   ├── page.tsx                   # Overview (KPIs + alerts)
-│   │   ├── accuracy/page.tsx          # Eval accuracy trends
-│   │   ├── quality/page.tsx           # Interaction quality flags
-│   │   ├── cost/page.tsx              # Token cost trends
-│   │   └── alerts/page.tsx            # Active alerts
-│   └── lib/snowflake.ts              # Snowflake query helper
-├── ci/                                 # CI/CD — vendor-neutral
-│   ├── README.md                      # Pipeline stages & wiring guide
-│   └── github/                        # GitHub Actions examples
-├── config/                             # All configuration
-│   ├── defaults.yaml                  # Universal: LLM models + credit pricing
-│   ├── environments.yaml.template     # Instance config template
-│   ├── monitoring.yaml.template       # Alert thresholds
-│   └── thresholds.yaml.template       # Eval accuracy thresholds
-├── docs/                               # Reference & explanation docs
-│   ├── README.md                      # Documentation index
-│   ├── explanation/                   # Design & intent
-│   └── reference/                     # Lookup-style: cost model
-├── evaluation/                         # All evaluation + monitoring Python
-│   ├── audit_semantic_view.py         # Best practices audit (structural)
-│   ├── audit_agent.py                 # Native GPA evaluation
-│   ├── evaluate_semantic_view.py      # Batch SV eval (SQL + LLM judge)
-│   ├── llm_judge.py                   # LLM-as-a-Judge
-│   ├── discover_account.py            # Account discovery
-│   ├── generate_question_bank.py      # Starter question-bank generator
-│   ├── health_check.py               # Health checks
-│   ├── cost_reconcile.py             # Reconcile estimated vs actual credits
-│   ├── adversarial_library.yaml       # Curated adversarial patterns
-│   └── utils.py                       # Config loader + Snowflake helpers
-├── question_banks/                     # Your question banks
-│   ├── agent/                         # Answerable, OOS, adversarial
-│   └── semantic_view/                 # Easy, hard, ambiguous
-├── setup/                              # Snowflake setup SQL
-│   ├── 00_framework_tables.sql        # All framework objects (tables, views, alerts, tasks)
-│   └── deploy.py                      # Deploy SV/agent to an env (CI helper)
-├── .gitignore
-├── AGENT.md                           # CoCo agent instructions
-├── CHANGELOG.md
-├── CONTRIBUTING.md
-├── LICENSE
-├── NOTICE
-├── README.md
-└── requirements.txt
+├── .cortex/skills/      # Cortex Code bootstrap skill
+├── agents/              # Agent specs under governance
+├── semantic_views/      # Semantic view definitions under governance
+├── question_banks/      # Evaluation question banks (agent + semantic_view)
+├── evaluation/          # Evaluation + monitoring Python (audits, judge, health, cost)
+├── setup/               # Framework SQL objects + deploy helper
+├── config/              # Configuration (environments, thresholds, monitoring, defaults)
+├── app/                 # App Runtime monitoring dashboard (Next.js)
+└── docs/                # Reference, how-to & explanation docs
 ```
+
+For the full file-by-file layout, see [AGENT.md](AGENT.md).
 
 ---
 
-## Run Evaluations Locally
+## Run evaluations locally
 
-```bash
-# Discover agents and semantic views in your account
-python evaluation/discover_account.py --format json
-
-# SV best practices audit (free — no LLM calls)
-python evaluation/audit_semantic_view.py --environment dev --live --semantic-view DB.SCHEMA.MY_SV
-
-# SV question bank evaluation
-python evaluation/evaluate_semantic_view.py --environment dev
-
-# Agent native GPA evaluation
-python evaluation/audit_agent.py --environment dev
-
-# Generate a starter question bank from your semantic view
-python evaluation/generate_question_bank.py --semantic-view-yaml path/to/sv.yaml
-
-# Health checks
-python evaluation/health_check.py --environment dev
-```
+You can run audits, evaluations, question-bank generation, and health checks from the command line against any configured environment. See [How-to: Run evaluations locally](docs/how-to/run-evaluations-locally.md) for the full command reference.
 
 ---
 
-## Monitoring & Observability
+## Monitoring & observability
 
-The framework creates tables, views, alerts, and tasks in your chosen schema (see `setup/00_framework_tables.sql`).
+The framework creates tables, views, alerts, and tasks in your chosen schema (see `setup/00_framework_tables.sql`). Three daily tasks aggregate usage, feedback, and interaction-quality data, and seven Snowflake Alerts fire on regressions — feedback spikes, accuracy drops, latency degradation, cost anomalies, error spikes, health failures, and interaction-quality issues. See [Pillar 3: Runtime monitoring](docs/explanation/pillar-3-runtime-monitoring.md) for the full task schedule, alert thresholds, and severity logic.
 
-### Automated Schedules (Snowflake Tasks)
-
-| Schedule | What |
-|----------|------|
-| Daily 02:00 UTC | Token usage & cost aggregation |
-| Daily 02:15 UTC | Feedback sentiment analysis |
-| Daily 02:30 UTC | Interaction quality scan |
-
-### Alerts (Snowflake Alerts)
-
-| Alert | Trigger |
-|-------|---------|
-| Negative Feedback Spike | >25% negative feedback |
-| Accuracy Regression | >10% accuracy drop |
-| Latency Degradation | P95 > 30s |
-| Cost Anomaly | Daily > 2x 7-day average |
-| Error Spike | Error rate > 10% |
-| Health Failure | Any UNHEALTHY check |
-| Interaction Quality | >20% flagged or CRITICAL |
-
-### Monitoring Dashboard (App Runtime)
+### Monitoring dashboard (App Runtime)
 
 Deploy the Next.js dashboard to Snowflake:
 
@@ -242,9 +142,9 @@ The dashboard shows: KPIs, accuracy trends, interaction quality flags, token cos
 
 ---
 
-## CI/CD Pipeline
+## CI/CD pipeline
 
-See [ci/README.md](ci/README.md) for full documentation on pipeline stages and how to wire them into GitHub Actions, GitLab CI, Azure DevOps, or any other CI system.
+See [Set up CI/CD](docs/how-to/set-up-ci-cd.md) for full documentation on pipeline stages and how to wire them into GitHub Actions, GitLab CI, Azure DevOps, or any other CI system.
 
 **Pipeline stages:**
 1. **Audit** — structural checks (free)
@@ -253,23 +153,9 @@ See [ci/README.md](ci/README.md) for full documentation on pipeline stages and h
 
 ---
 
-## Configuring Thresholds
+## Configuring thresholds
 
-Edit `config/thresholds.yaml` to adjust quality gates:
-
-```yaml
-semantic_view:
-  prod:
-    accuracy_threshold: 85
-    easy_min_accuracy: 95
-    hard_min_accuracy: 75
-    ambiguous_min_accuracy: 60
-
-agent:
-  prod:
-    accuracy_threshold: 85
-    adversarial_min_accuracy: 98
-```
+Quality gates are configured per environment in `config/thresholds.yaml` — permissive on DEV (lets developers iterate) and strict on PROD (protects production quality). See [Pillar 2: Output evaluation](docs/explanation/pillar-2-output-evaluation.md#quality-gates-in-ci) for the threshold model and a worked example.
 
 ---
 
@@ -277,17 +163,10 @@ agent:
 
 | Document | Type | What it covers |
 |----------|------|----------------|
-| [ci/README.md](ci/README.md) | Guide | CI/CD pipeline stages + env vars |
+| [Set up CI/CD](docs/how-to/set-up-ci-cd.md) | How-to | Pipeline stages, env vars, wiring into any CI |
+| [Run evaluations locally](docs/how-to/run-evaluations-locally.md) | How-to | CLI commands for audits, evals, and health checks |
 | [docs/README.md](docs/README.md) | Index | Documentation map |
 | [Cost model](docs/reference/cost-model.md) | Reference | Evaluation cost in AI Credits |
-| [Input governance](docs/explanation/pillar-1-input-governance.md) | Explanation | Semantic view audit design |
-
----
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch → PR → merge workflow.
-
-## License
-
-Licensed under the [Apache License 2.0](LICENSE) (see also [NOTICE](NOTICE)).
+| [Pillar 1: Input governance](docs/explanation/pillar-1-input-governance.md) | Explanation | Semantic view audit design |
+| [Pillar 2: Output evaluation](docs/explanation/pillar-2-output-evaluation.md) | Explanation | Question banks, LLM judge, GPA eval, CI gates |
+| [Pillar 3: Runtime monitoring](docs/explanation/pillar-3-runtime-monitoring.md) | Explanation | Interaction-quality engine, alerts, trend views |

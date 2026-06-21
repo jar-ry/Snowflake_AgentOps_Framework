@@ -1,6 +1,6 @@
 # Pillar 2: Output Evaluation
 
-> Status: Stable | Last reviewed: 2026-06-08 | Audience: Engineers, solution architects, customers
+> Status: Stable | Last reviewed: 2026-06-21 | Audience: Engineers, solution architects, customers
 
 **Purpose.** Explain how the framework evaluates the quality of agent and semantic view outputs using question banks, LLM-as-a-judge, and Snowflake's native GPA evaluation — and how these gates prevent regressions from reaching production.
 
@@ -12,12 +12,16 @@ The premise: a semantic view can pass all structural checks and still produce wr
 
 ## Two evaluation paths
 
-### Semantic View Evaluation (`evaluate_semantic_view.py`)
+### Semantic view evaluation (`evaluate_semantic_view.py`)
 
 Tests the text-to-SQL pipeline directly:
 
-```
-User question → Cortex Analyst (via semantic view) → Generated SQL → Execute → Compare result to ground truth
+```mermaid
+flowchart LR
+    Q["User question"] --> CA["Cortex Analyst<br/>(via semantic view)"]
+    CA --> SQL["Generated SQL"]
+    SQL --> EX["Execute"]
+    EX --> CMP["Compare result<br/>to ground truth"]
 ```
 
 The evaluator:
@@ -34,12 +38,15 @@ The evaluator:
 | Hard | Multi-table joins, complex filters, edge cases | SQL result comparison + LLM judge | 75% |
 | Ambiguous | Questions with multiple valid interpretations | LLM-as-a-Judge only (semantic similarity) | 60% |
 
-### Agent Evaluation (`audit_agent.py`)
+### Agent evaluation (`audit_agent.py`)
 
 Tests the full agent orchestration using Snowflake's native `EXECUTE_AI_EVALUATION` with the GPA (Grounded Performance Assessment) framework:
 
-```
-User question → Agent (plans, selects tools, calls analyst, synthesizes) → Answer → Score against ground truth
+```mermaid
+flowchart LR
+    Q["User question"] --> AG["Agent<br/>(plans, selects tools,<br/>calls analyst, synthesizes)"]
+    AG --> ANS["Answer"]
+    ANS --> SC["Score against<br/>ground truth"]
 ```
 
 **Built-in + custom metrics:**
@@ -83,13 +90,15 @@ questions:
 
 The most powerful pattern: **user feedback drives question bank growth**.
 
-```
-User gives negative feedback on a query
-    → Dashboard shows alert with tooltip: "Add this to hard questions"
-    → Engineer adds the query to question_banks/semantic_view/hard_questions.yaml
-    → CI runs evaluation including the new question
-    → If it fails: fix the semantic view (add VQR, improve descriptions)
-    → Regression is now permanently caught by CI
+```mermaid
+flowchart TB
+    FB["User gives negative feedback on a query"]
+    DASH["Dashboard shows alert with tooltip:<br/>Add this to hard questions"]
+    ADD["Engineer adds the query to<br/>question_banks/semantic_view/hard_questions.yaml"]
+    CI["CI runs evaluation including the new question"]
+    FIX["If it fails: fix the semantic view<br/>(add VQR, improve descriptions)"]
+    REG["Regression is now permanently caught by CI"]
+    FB --> DASH --> ADD --> CI --> FIX --> REG
 ```
 
 This creates a ratchet effect — every production failure becomes a regression test.
@@ -108,11 +117,16 @@ The judge is deliberately separate from the agent being evaluated — this preve
 
 Evaluation results gate merge/deploy:
 
-```
-PR opened → Evaluate on DEV
-    → accuracy >= threshold?
-        YES → Allow merge → CD evaluates again → Deploy to PROD
-        NO  → Block merge, post results as PR comment
+```mermaid
+flowchart TB
+    PR["PR opened → Evaluate on DEV"] --> GATE{"accuracy ≥ threshold?"}
+    GATE -->|YES| Y["Allow merge → CD evaluates again → Deploy to PROD"]
+    GATE -->|NO| N["Block merge, post results as PR comment"]
+
+    classDef pass fill:#d4edda,stroke:#28a745,color:#155724;
+    classDef fail fill:#f8d7da,stroke:#dc3545,color:#721c24;
+    class Y pass;
+    class N fail;
 ```
 
 Thresholds are configured in `config/thresholds.yaml`:

@@ -1,4 +1,8 @@
 .streamlit/secrets.toml
+
+# Cortex Code local development state (plans, session artifacts) — local only
+.snowflake/
+
 __pycache__/
 *.pyc
 .env
