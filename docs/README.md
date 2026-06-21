@@ -8,6 +8,7 @@
 
 | Mode | Directory | Answers the question | When to read |
 | --- | --- | --- | --- |
+| How-to | `how-to/` | "How do I perform this task?" | You need step-by-step commands for a specific job |
 | Reference | `reference/` | "What are the exact details?" | You need precise, lookup-style information |
 | Explanation | `explanation/` | "Why does it work this way?" | You want to understand the design and tradeoffs |
 
@@ -39,6 +40,12 @@ flowchart LR
     class P1,P2,P3 pillar;
 ```
 
+## How-to
+
+Task-oriented, step-by-step guides.
+
+- [Run evaluations locally](how-to/run-evaluations-locally.md) — CLI commands for audits, evaluations, question-bank generation, and health checks against a configured environment.
+
 ## Reference
 
 Information-oriented, lookup-style material.
@@ -47,13 +54,4 @@ Information-oriented, lookup-style material.
 
 ## Documentation conventions
 
-Every document in this tree follows these conventions:
-
-- A single H1 title, followed by a metadata blockquote: `Status | Last reviewed | Audience`.
-- A one-line **Purpose** statement directly under the metadata.
-- Sentence-case headings.
-- Relative links between documents (so they resolve on GitHub and in local viewers).
-- Fenced code blocks with an explicit language tag.
-- Tables for reference data rather than long prose lists.
-
-When adding a document, place it in the directory matching its Diataxis mode and add a link to this index.
+Every document in this tree leads with a single H1 title, a `Status | Last reviewed | Audience` metadata blockquote, and a one-line **Purpose** statement, and uses sentence-case headings, relative links, language-tagged code fences, and tables for reference data. When adding a document, place it in the directory matching its Diataxis mode and link it from this index.
