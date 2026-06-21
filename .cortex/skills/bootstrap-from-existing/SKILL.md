@@ -316,71 +316,54 @@ If NO existing evaluation data was found, tell the user:
 - "No existing VQRs or eval datasets found. Generating starter question banks..."
 - Then suggest: `python evaluation/generate_question_bank.py --semantic-view-yaml <path>` to generate questions from the semantic view structure using an LLM.
 
-### Step 7: Set Up CI Access (only if a network policy is present)
+### Step 7: CI Authentication (use the operator's own user — do NOT create a user)
 
-CI/CD runs on GitHub-hosted runners, which connect from dynamic Azure IPs. If the account enforces an IP-based network policy, those runners are blocked and the customer's first CI run fails with `250001 ... IP/Token ... is not allowed to access Snowflake`. Most accounts (and all trial accounts) have no network policy, so this step is usually a no-op.
+CI/CD authenticates to Snowflake as an **existing user — the operator's own Snowflake login** (or another human/role they already have). This skill does **NOT** create a CI or service user, and does **NOT** create or alter any network policy. The operator provides credentials for a user that already exists.
 
-Check for an account-level network policy:
+Tell the user to set the GitHub secrets (quickstart Step 3) to:
+- `SNOWFLAKE_USER` → their own Snowflake username
+- `SNOWFLAKE_PRIVATE_KEY` → the PKCS8 private key paired with that user's `RSA_PUBLIC_KEY`
+
+#### 7a: Make sure the authenticating role has what the workflows need
+
+Whatever role CI authenticates as must hold the privileges the workflows touch. If the operator runs as `ACCOUNTADMIN` or the role that ran the bootstrap (and therefore owns the framework schema), these are already satisfied — skip what's already held. Otherwise grant them to `<ci_role>` (the operator's role).
+
+`audit_agent.py` calls Snowflake's native `EXECUTE_AI_EVALUATION`, which runs **in the agent's own database and schema** (the metric judges resolve the agent relative to the session schema, so the eval must run where the agent lives — NOT in the framework schema). It creates an eval-data table, a config stage, an evaluation dataset, and a multi-task DAG in that schema, then invokes the agent and computes metrics. For **each governed agent** selected in Step 2:
+
+```sql
+GRANT USAGE              ON DATABASE <agent_db>                  TO ROLE <ci_role>;
+GRANT USAGE              ON SCHEMA   <agent_db>.<agent_schema>   TO ROLE <ci_role>;
+GRANT CREATE TABLE       ON SCHEMA   <agent_db>.<agent_schema>   TO ROLE <ci_role>;
+GRANT CREATE STAGE       ON SCHEMA   <agent_db>.<agent_schema>   TO ROLE <ci_role>;
+GRANT CREATE DATASET     ON SCHEMA   <agent_db>.<agent_schema>   TO ROLE <ci_role>;
+GRANT CREATE FILE FORMAT ON SCHEMA   <agent_db>.<agent_schema>   TO ROLE <ci_role>;
+GRANT CREATE TASK        ON SCHEMA   <agent_db>.<agent_schema>   TO ROLE <ci_role>;
+GRANT USAGE              ON AGENT    <agent_fqn>                 TO ROLE <ci_role>;
+GRANT MONITOR            ON AGENT    <agent_fqn>                 TO ROLE <ci_role>;
+GRANT EXECUTE TASK       ON ACCOUNT                              TO ROLE <ci_role>;
+```
+Why each is needed, and the failure mode if missing (each was hit in this order while debugging a real run):
+- **CREATE TABLE / STAGE / DATASET / FILE FORMAT / TASK** on the agent's schema — the eval builds these objects and a task DAG there at runtime. Missing any one makes a DAG task fail (e.g. "must have CREATE TASK" / "must have CREATE FILE FORMAT") and the run silently hangs in `CREATED` until the script times out.
+- **USAGE + MONITOR on the agent** — `EXECUTE_AI_EVALUATION` needs both; `USAGE` alone makes `START` fail with a misleading `Run <name> not found for object ... type CORTEX AGENT`. `MONITOR` is read-only, so the customer's agent stays under their ownership.
+- **EXECUTE TASK ON ACCOUNT** — account-level, so it must be granted by ACCOUNTADMIN. Required even if the role owns the schema.
+- The role must also reach every tool the agent uses (e.g. `SELECT` on the bound semantic view's tables and `REFERENCES`/`SELECT` on the semantic view), plus `USAGE`/write on the framework schema, `USAGE`/`OPERATE` on the warehouse, and the `SNOWFLAKE.CORTEX_USER` database role for Cortex Analyst + the LLM judge.
+
+#### 7b: If the account has an IP network policy
+
+CI/CD runs on GitHub-hosted runners, which connect from dynamic Azure IPs. If the account enforces an IP-based network policy, those runners are blocked and the first CI run fails with `250001 ... IP/Token ... is not allowed to access Snowflake`. Most accounts (and all trial accounts) have no network policy, so this is usually a no-op.
+
 ```sql
 SHOW PARAMETERS LIKE 'NETWORK_POLICY' IN ACCOUNT;
 ```
 
-If the `value` is empty, tell the user "No network policy detected — CI will connect with key-pair auth, nothing extra needed" and skip the rest of this step.
+If the `value` is empty, tell the user "No network policy detected — CI will connect with key-pair auth as your own user, nothing extra needed."
 
-If a network policy IS set, explain the situation and use `ask_user_question` to offer to set up a dedicated, secure CI service user:
+If a network policy IS set, explain that GitHub-hosted runners are blocked and present options that do **NOT** involve creating a user or weakening the account policy:
+- Run CI on a **self-hosted GitHub runner** on an allowlisted IP/network.
+- Ask an admin to **allowlist the runner egress IPs** in the existing policy's `ALLOWED_IP_LIST` (only if those IPs are known/stable).
+- (Deferred) A dedicated key-pair-only CI service user, exempt via a **user-scoped** policy, is the long-term best practice but is intentionally **out of scope** for this skill.
 
-> "Your account restricts access by IP (`<policy_name>`). GitHub's CI runners use rotating IPs that can't be allowlisted. The standard secure fix is a dedicated CI service user that authenticates with a key pair (no password) and is exempt from the IP restriction — the exemption is scoped to this one non-human account, so your human logins stay protected. Set this up?"
-
-You must NOT weaken the account policy and you must NOT attach an allow-all policy to a human/admin user. Only ever scope the exemption to a dedicated service user.
-
-If the user agrees:
-
-1. Ask for the **public key** they will pair with the `SNOWFLAKE_PRIVATE_KEY` GitHub secret (the contents of their `snowflake_key.pub`, without the header/footer lines). Use `ask_user_question`, type text.
-
-2. Create a dedicated, key-pair-only service user (no password set):
-   ```sql
-   CREATE USER IF NOT EXISTS AGENTOPS_CI_USER
-     RSA_PUBLIC_KEY = '<pasted_public_key>'
-     DEFAULT_WAREHOUSE = '<framework_warehouse>'
-     DEFAULT_ROLE = '<minimal_role>'
-     COMMENT = 'Key-pair-only CI service user for AgentOps GitHub Actions';
-   ```
-
-3. Create a user-scoped allow-all network policy and attach it to ONLY this user (this overrides the account policy for this user alone):
-   ```sql
-   CREATE NETWORK POLICY IF NOT EXISTS AGENTOPS_CI_POLICY
-     ALLOWED_IP_LIST = ('0.0.0.0/0')
-     COMMENT = 'Allow-all for key-pair-only AgentOps CI service user. Safe: scoped to one non-human, key-pair-only account.';
-   ALTER USER AGENTOPS_CI_USER SET NETWORK_POLICY = AGENTOPS_CI_POLICY;
-   ```
-
-4. Grant the service user the minimal role the framework needs (the same role used for the framework schema — NOT ACCOUNTADMIN):
-   ```sql
-   GRANT ROLE <minimal_role> TO USER AGENTOPS_CI_USER;
-   ```
-
-5. Grant the role the privileges native agent evaluation needs. `audit_agent.py` calls Snowflake's native `EXECUTE_AI_EVALUATION`, which runs **in the agent's own database and schema** (the metric judges resolve the agent relative to the session schema, so the eval must run where the agent lives — NOT in the framework schema). It creates an eval-data table, a config stage, an evaluation dataset, and a multi-task DAG in that schema, then invokes the agent and computes metrics. For **each governed agent** selected in Step 2, grant the CI role the following on the agent's own database/schema/object:
-   ```sql
-   GRANT USAGE              ON DATABASE <agent_db>                  TO ROLE <minimal_role>;
-   GRANT USAGE              ON SCHEMA   <agent_db>.<agent_schema>   TO ROLE <minimal_role>;
-   GRANT CREATE TABLE       ON SCHEMA   <agent_db>.<agent_schema>   TO ROLE <minimal_role>;
-   GRANT CREATE STAGE       ON SCHEMA   <agent_db>.<agent_schema>   TO ROLE <minimal_role>;
-   GRANT CREATE DATASET     ON SCHEMA   <agent_db>.<agent_schema>   TO ROLE <minimal_role>;
-   GRANT CREATE FILE FORMAT ON SCHEMA   <agent_db>.<agent_schema>   TO ROLE <minimal_role>;
-   GRANT CREATE TASK        ON SCHEMA   <agent_db>.<agent_schema>   TO ROLE <minimal_role>;
-   GRANT USAGE              ON AGENT    <agent_fqn>                 TO ROLE <minimal_role>;
-   GRANT MONITOR            ON AGENT    <agent_fqn>                 TO ROLE <minimal_role>;
-   GRANT EXECUTE TASK       ON ACCOUNT                              TO ROLE <minimal_role>;
-   ```
-   Why each is needed, and the failure mode if missing (each was hit in this order while debugging a real run):
-   - **CREATE TABLE / STAGE / DATASET / FILE FORMAT / TASK** on the agent's schema — the eval builds these objects and a task DAG there at runtime. Missing any one makes a DAG task fail (e.g. "must have CREATE TASK" / "must have CREATE FILE FORMAT") and the run silently hangs in `CREATED` until the script times out.
-   - **USAGE + MONITOR on the agent** — `EXECUTE_AI_EVALUATION` needs both; `USAGE` alone makes `START` fail with a misleading `Run <name> not found for object ... type CORTEX AGENT`. `MONITOR` is read-only, so the customer's agent stays under their ownership.
-   - **EXECUTE TASK ON ACCOUNT** — account-level, so it must be granted by ACCOUNTADMIN. Required even if the role owns the schema.
-   - The role must also reach every tool the agent uses (e.g. `SELECT` on the bound semantic view's tables and `REFERENCES`/`SELECT` on the semantic view) — the governed-object grants cover this.
-
-   (Skip any grant the role already holds. If the CI role already owns the agent's schema, ownership implies the schema-level grants, but `USAGE`/`MONITOR` on the agent and `EXECUTE TASK ON ACCOUNT` are still required.)
-
-6. Tell the user: set the `SNOWFLAKE_USER` GitHub secret to `AGENTOPS_CI_USER` (instead of their own username), and use the matching private key for `SNOWFLAKE_PRIVATE_KEY`. The rest of the account stays locked to the existing network policy.
+You must NOT weaken the account policy and you must NOT attach an allow-all policy to a human/admin user.
 
 ### Step 8: Verify & Report
 
@@ -410,9 +393,19 @@ Tell the user:
 5. (Optional) Set up CI/CD — see `docs/how-to/set-up-ci-cd.md`
 6. (Optional) Deploy the monitoring dashboard: `cd app && snow app setup && snow app deploy`
 
+## Teardown / re-bootstrap
+
+Removing framework objects has two non-obvious couplings that will break a live CI repo if you tear down in the wrong order. Safe rule: **retire (or repoint) the CI repo first, drop Snowflake objects last** — or keep the schema and re-seed/re-bootstrap on top instead of dropping anything.
+
+1. **Never drop the framework schema while a CI repo still points at it.** `evaluation/utils.py` `get_connection()` runs `USE DATABASE` + `USE SCHEMA <framework_schema>` on *every* connection (lines ~168–169), and the deployed dashboard runs `USE SCHEMA` per query (`app/lib/snowflake.ts`). A missing schema therefore fails every connecting job *before any logic runs*, with a confusing "schema does not exist / not authorized" error rather than an eval failure. To wipe data without breaking CI, `TRUNCATE` the framework tables — do NOT `DROP SCHEMA`.
+
+2. **Never drop a CI identity that an IP network policy depends on.** This skill does not create a CI user (Step 7), but if your account enforces an IP network policy and you manually set up a dedicated CI user with a **user-scoped** allow-all policy, that policy is the *only* thing exempting GitHub's rotating runner IPs from the account policy. Dropping the user or its policy immediately IP-blocks CI (`250001 ... IP/Token ... is not allowed`). Keep both as long as CI runs from GitHub-hosted runners.
+
+**Re-bootstrap (the usual path):** to refresh on top of an existing install, keep the schema and any CI identity and just re-run the bootstrap — framework DDL uses `CREATE ... IF NOT EXISTS` / `CREATE OR REPLACE`, so it is safe to re-apply — then re-seed the question banks. Only do a full `DROP` after the CI repo is retired or repointed at a different schema.
+
 ## Important Notes
 
-- This skill does NOT create databases, warehouses, or RBAC roles — it uses what already exists.
+- This skill does NOT create databases, warehouses, RBAC roles, or users — it uses what already exists. CI/CD authenticates as the operator's own existing Snowflake login (see Step 7).
 - The `prod` environment section is intentionally empty — it's populated later when CI/CD is configured.
 - If `SHOW AGENTS` or `SHOW SEMANTIC VIEWS` returns errors or fewer objects than expected, the running role likely lacks visibility, OR the search scope chosen in Step 1 is too narrow. Suggest the user widen the scope (e.g. re-run with `IN ACCOUNT`) and/or switch to a role with broader grants or ACCOUNTADMIN.
 - The framework schema is the ONLY place where new objects are created.
