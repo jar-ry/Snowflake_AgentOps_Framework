@@ -1,12 +1,16 @@
-# CI/CD Pipeline
+# CI/CD pipeline
 
-This framework is **CI/CD-stack agnostic**. The pipeline logic lives in Python scripts under `evaluation/` and `setup/`. The CI/CD YAML files are just orchestration wrappers that call these scripts.
+> Status: Stable | Last reviewed: 2026-06-21 | Audience: Engineers, platform/DevOps
 
-## Pipeline Stages
+**Purpose.** Document the framework's vendor-neutral CI/CD pipeline — the stages every semantic view or agent change passes through, the scripts that implement them, and how to wire them into any CI system.
+
+This framework is **CI/CD-stack agnostic**. The pipeline logic lives in Python scripts under `evaluation/` and `setup/`; the CI YAML files are just orchestration wrappers that call those scripts.
+
+## Pipeline stages
 
 Every semantic view or agent change should pass through these stages:
 
-### Stage 1: Audit (Structural, free)
+### Stage 1: Audit (structural, free)
 ```bash
 python evaluation/audit_semantic_view.py --environment dev --ddl-file <path-to-yaml>
 ```
@@ -23,7 +27,7 @@ python evaluation/evaluate_semantic_view.py --environment dev --semantic-view DB
 - Reports accuracy percentage by difficulty category
 - **Gate**: Must exceed threshold defined in `config/thresholds.yaml`
 
-### Stage 3: Agent Evaluation (Native GPA)
+### Stage 3: Agent evaluation (native GPA)
 ```bash
 python evaluation/audit_agent.py --environment dev --agent-name DB.SCHEMA.MY_AGENT
 ```
@@ -31,7 +35,7 @@ python evaluation/audit_agent.py --environment dev --agent-name DB.SCHEMA.MY_AGE
 - Scores up to 8 metrics by default — built-in (`answer_correctness`, `logical_consistency`) plus custom LLM-judged (`safety`, `groundedness`, `execution_efficiency`, `answer_relevance`, `conciseness`, `pii_leakage`). The active set is configurable per environment via `thresholds.yaml` (`agent.<env>.metrics`); see [docs/explanation/pillar-2-output-evaluation.md](../docs/explanation/pillar-2-output-evaluation.md).
 - **Gate**: Must exceed per-metric thresholds
 
-### Stage 4: Deploy (Promote to production)
+### Stage 4: Deploy (promote to production)
 ```bash
 python setup/deploy.py --target semantic_view --environment prod
 python setup/deploy.py --target agent --environment prod
@@ -39,7 +43,7 @@ python setup/deploy.py --target agent --environment prod
 - Only runs after all gates pass on merge to main
 - Deploys the semantic view YAML or agent SQL to the production environment
 
-## Wiring Into Your CI System
+## Wiring into your CI system
 
 The scripts above are the interface. Your CI system just needs to:
 1. Check out the repo
@@ -50,7 +54,7 @@ The scripts above are the interface. Your CI system just needs to:
 4. Run the scripts in order, failing the pipeline if any exit non-zero
 
 ### GitHub Actions
-See `ci/github/` for working examples. Copy to `.github/workflows/` in your repo.
+This repo's own workflows in [`.github/workflows/`](../.github/workflows/) are the reference implementation — `agent_ci.yml`, `agent_cd.yml`, `semantic_view_ci.yml`, and `semantic_view_cd.yml`. Adapt them in place, or copy them into your own repo.
 
 ### GitLab CI
 ```yaml
@@ -80,7 +84,7 @@ deploy-prod:
 ### Azure DevOps / Other
 Follow the same pattern: install deps, set env vars, run scripts sequentially.
 
-## Environment Variables
+## Environment variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|

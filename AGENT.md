@@ -43,8 +43,7 @@ Snowflake_AgentOps_Framework/
 ├── semantic_views/                     # Semantic view definitions under governance
 ├── app/                                # App Runtime dashboard (Next.js)
 ├── ci/                                 # CI/CD — vendor-neutral
-│   ├── README.md                      # Pipeline stages & wiring guide
-│   └── github/                        # GitHub Actions examples
+│   └── README.md                      # Pipeline stages & wiring guide
 ├── config/                             # All configuration
 │   ├── defaults.yaml                  # LLM models + credit pricing
 │   ├── environments.yaml.template     # Instance config template
@@ -130,4 +129,4 @@ Python scripts connect via a named connection (from `config/environments.yaml`) 
 
 ### CI/CD
 
-Vendor-neutral; stages are Audit → Evaluate → Deploy. See [ci/README.md](ci/README.md) for full wiring and the GitHub Actions examples in `ci/github/`.
+Vendor-neutral; stages are Audit → Evaluate → Deploy. See [ci/README.md](ci/README.md) for full wiring; the repo's own workflows live in `.github/workflows/`.

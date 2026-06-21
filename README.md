@@ -112,7 +112,7 @@ Snowflake_AgentOps_Framework/
 ├── evaluation/          # Evaluation + monitoring Python (audits, judge, health, cost)
 ├── setup/               # Framework SQL objects + deploy helper
 ├── config/              # Configuration (environments, thresholds, monitoring, defaults)
-├── ci/                  # Vendor-neutral CI/CD wiring + GitHub Actions examples
+├── ci/                  # Vendor-neutral CI/CD pipeline docs
 ├── app/                 # App Runtime monitoring dashboard (Next.js)
 └── docs/                # Reference & explanation docs
 ```
