@@ -1,0 +1,126 @@
+name: CI — Evaluate on PR / Branch Push
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'semantic_views/**'
+      - 'agents/**'
+      - 'question_banks/**'
+      - 'config/**'
+      - 'evaluation/**'
+  push:
+    branches-ignore: [main]
+    paths:
+      - 'semantic_views/**'
+      - 'agents/**'
+      - 'question_banks/**'
+      - 'config/**'
+      - 'evaluation/**'
+
+permissions:
+  id-token: write      # Required for OIDC token generation
+  contents: read
+  pull-requests: write
+
+jobs:
+  evaluate:
+    name: "Evaluate against DEV"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install and configure Snowflake CLI (OIDC)
+        uses: snowflakedb/snowflake-actions@v2.0.4
+        with:
+          use-oidc: true
+          cli-version: "3.16"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verify Snowflake connection
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: github_cicd_user
+        run: snow connection test -x
+
+      - name: Run semantic view evaluation
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: github_cicd_user
+        run: |
+          BRANCH="${{ github.head_ref || github.ref_name }}"
+          python evaluation/evaluate_semantic_view.py \
+            --environment dev \
+            --categories easy,hard,ambiguous \
+            --git-sha "${{ github.sha }}" \
+            --git-branch "$BRANCH" \
+            --output sv_eval_results.json || true
+
+      - name: Run agent evaluation
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: github_cicd_user
+        run: |
+          BRANCH="${{ github.head_ref || github.ref_name }}"
+          python evaluation/audit_agent.py \
+            --environment dev \
+            --git-sha "${{ github.sha }}" \
+            --git-branch "$BRANCH" \
+            --timeout 600 \
+            --output agent_eval_results.json || true
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-eval-results
+          path: |
+            sv_eval_results.json
+            agent_eval_results.json
+          if-no-files-found: ignore
+
+      - name: Comment PR with results
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            let svResults = {};
+            let agentResults = {};
+            try { svResults = JSON.parse(fs.readFileSync('sv_eval_results.json', 'utf8')); } catch (e) {}
+            try { agentResults = JSON.parse(fs.readFileSync('agent_eval_results.json', 'utf8')); } catch (e) {}
+
+            const svStatus = svResults?.summary?.passed_threshold ? '✅ PASSED' : '❌ FAILED';
+            const agentStatus = agentResults?.passed_threshold ? '✅ PASSED' : '⚠️ ' + (agentResults?.status || 'NOT_RUN');
+
+            const svAcc = svResults?.summary?.accuracy_pct || 'N/A';
+            const agentAvg = agentResults?.overall_average ? agentResults.overall_average.toFixed(3) : 'N/A';
+
+            const body = [
+              '## CI Evaluation Results',
+              '',
+              `### Semantic View ${svStatus}`,
+              `Accuracy: **${svAcc}%** (threshold: ${svResults?.summary?.threshold_pct || 'N/A'}%)`,
+              '',
+              `### Agent ${agentStatus}`,
+              `Overall average: **${agentAvg}**`,
+              '',
+              `> Commit: \`${context.sha.slice(0,7)}\` | Branch: \`${{ github.head_ref || github.ref_name }}\``,
+            ].join('\n');
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });

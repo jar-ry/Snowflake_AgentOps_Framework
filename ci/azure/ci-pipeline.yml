@@ -1,0 +1,86 @@
+# Azure DevOps CI Pipeline — Evaluate on PR / Branch Push
+# Authenticates to Snowflake via OIDC (workload identity federation).
+#
+# Prerequisites:
+#   1. Azure Entra ID App Registration with federated credential
+#   2. Azure DevOps service connection (workload identity)
+#   3. Snowflake service user with OIDC workload identity (see setup/cicd_setup.sql)
+#   4. Pipeline variable: SNOWFLAKE_ACCOUNT
+
+trigger:
+  branches:
+    exclude:
+      - main
+  paths:
+    include:
+      - semantic_views/*
+      - agents/*
+      - question_banks/*
+      - config/*
+      - evaluation/*
+
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - semantic_views/*
+      - agents/*
+      - question_banks/*
+      - config/*
+      - evaluation/*
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  - name: SNOWFLAKE_USER
+    value: ado_cicd_user
+
+steps:
+  - task: ConfigureSnowflakeCLI@0
+    inputs:
+      configFilePath: './ci/azure/config.toml'
+      cliVersion: 'latest'
+      useWorkloadIdentity: true
+      connectedServiceName: 'snowflake-wif-connection'
+    displayName: Configure Snowflake CLI (OIDC)
+
+  - script: snow connection test
+    displayName: Verify Snowflake connection
+
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.11'
+    displayName: Set up Python
+
+  - script: pip install -r requirements.txt
+    displayName: Install dependencies
+
+  - script: |
+      BRANCH=$(System.PullRequest.SourceBranch || Build.SourceBranchName)
+      python evaluation/evaluate_semantic_view.py \
+        --environment dev \
+        --categories easy,hard,ambiguous \
+        --git-sha $(Build.SourceVersion) \
+        --git-branch "$BRANCH" \
+        --output $(Build.ArtifactStagingDirectory)/sv_eval_results.json || true
+    displayName: Evaluate semantic view
+
+  - script: |
+      BRANCH=$(System.PullRequest.SourceBranch || Build.SourceBranchName)
+      python evaluation/audit_agent.py \
+        --environment dev \
+        --git-sha $(Build.SourceVersion) \
+        --git-branch "$BRANCH" \
+        --timeout 600 \
+        --output $(Build.ArtifactStagingDirectory)/agent_eval_results.json || true
+    displayName: Evaluate agent
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathToPublish: $(Build.ArtifactStagingDirectory)
+      artifactName: ci-eval-results
+    condition: always()
+    displayName: Publish evaluation results

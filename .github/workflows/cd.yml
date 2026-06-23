@@ -1,0 +1,120 @@
+name: CD — Deploy to PROD on merge
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'semantic_views/**'
+      - 'agents/**'
+      - 'question_banks/**'
+      - 'config/**'
+      - 'evaluation/**'
+
+permissions:
+  id-token: write      # Required for OIDC token generation
+  contents: read
+
+jobs:
+  evaluate-and-deploy:
+    name: "Evaluate → Gate → Deploy to PROD"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install and configure Snowflake CLI (OIDC)
+        uses: snowflakedb/snowflake-actions@v2.0.4
+        with:
+          use-oidc: true
+          cli-version: "3.16"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verify Snowflake connection
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: github_cicd_user
+        run: snow connection test -x
+
+      # --- Quality Gate: Evaluate against DEV ---
+      - name: Evaluate semantic view (quality gate)
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: github_cicd_user
+        run: |
+          python evaluation/evaluate_semantic_view.py \
+            --environment dev \
+            --categories easy,hard,ambiguous \
+            --git-sha ${{ github.sha }} \
+            --git-branch main \
+            --output sv_eval_results.json
+
+      - name: Check semantic view passed threshold
+        run: |
+          python -c "
+          import json, sys
+          with open('sv_eval_results.json') as f:
+              r = json.load(f)
+          s = r.get('summary', {})
+          if not s.get('passed_threshold'):
+              print(f'GATE FAILED: SV accuracy {s.get(\"accuracy_pct\")}% below threshold {s.get(\"threshold_pct\")}%')
+              sys.exit(1)
+          print(f'GATE PASSED: SV accuracy {s.get(\"accuracy_pct\")}% meets threshold {s.get(\"threshold_pct\")}%')
+          "
+
+      - name: Evaluate agent (quality gate)
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: github_cicd_user
+        run: |
+          python evaluation/audit_agent.py \
+            --environment dev \
+            --git-sha ${{ github.sha }} \
+            --git-branch main \
+            --timeout 600 \
+            --output agent_eval_results.json
+
+      - name: Check agent passed threshold
+        run: |
+          python -c "
+          import json, sys
+          with open('agent_eval_results.json') as f:
+              r = json.load(f)
+          if not r.get('passed_threshold'):
+              avg = r.get('overall_average', 0)
+              print(f'GATE FAILED: Agent avg {avg:.3f}')
+              sys.exit(1)
+          print(f'GATE PASSED: Agent avg {r.get(\"overall_average\", 0):.3f}')
+          "
+
+      # --- Deploy to PROD ---
+      - name: Deploy semantic views to PROD
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: github_cicd_user
+        run: python setup/deploy.py --target semantic_view --environment prod
+
+      - name: Deploy agents to PROD
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: github_cicd_user
+        run: python setup/deploy.py --target agent --environment prod
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-prod-deployment-results
+          path: |
+            sv_eval_results.json
+            agent_eval_results.json
+          if-no-files-found: ignore

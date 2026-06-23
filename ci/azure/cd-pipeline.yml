@@ -1,0 +1,139 @@
+# Azure DevOps CD Pipeline — Deploy to PROD on merge to main
+# Authenticates to Snowflake via OIDC (workload identity federation).
+#
+# Prerequisites:
+#   1. Azure Entra ID App Registration with federated credential
+#   2. Azure DevOps service connection (workload identity)
+#   3. Snowflake service user with OIDC workload identity
+#   4. Pipeline variable: SNOWFLAKE_ACCOUNT
+#   5. CICD_DEPLOY_ROLE with CREATE perms on prod database
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - semantic_views/*
+      - agents/*
+      - question_banks/*
+      - config/*
+      - evaluation/*
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  - name: SNOWFLAKE_USER
+    value: ado_cicd_user
+
+stages:
+  - stage: Evaluate
+    displayName: Quality Gate — Evaluate against DEV
+    jobs:
+      - job: EvaluateAndGate
+        displayName: Run evaluations
+        steps:
+          - checkout: self
+            fetchDepth: 0
+
+          - task: ConfigureSnowflakeCLI@0
+            inputs:
+              configFilePath: './ci/azure/config.toml'
+              cliVersion: 'latest'
+              useWorkloadIdentity: true
+              connectedServiceName: 'snowflake-wif-connection'
+            displayName: Configure Snowflake CLI (OIDC)
+
+          - script: snow connection test
+            displayName: Verify Snowflake connection
+
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '3.11'
+            displayName: Set up Python
+
+          - script: pip install -r requirements.txt
+            displayName: Install dependencies
+
+          - script: |
+              python evaluation/evaluate_semantic_view.py \
+                --environment dev \
+                --categories easy,hard,ambiguous \
+                --git-sha $(Build.SourceVersion) \
+                --git-branch main \
+                --output sv_eval_results.json
+            displayName: Evaluate semantic view (gate)
+
+          - script: |
+              python -c "
+              import json, sys
+              with open('sv_eval_results.json') as f:
+                  r = json.load(f)
+              s = r.get('summary', {})
+              if not s.get('passed_threshold'):
+                  print(f'GATE FAILED: {s.get(\"accuracy_pct\")}% below {s.get(\"threshold_pct\")}%')
+                  sys.exit(1)
+              print(f'GATE PASSED: {s.get(\"accuracy_pct\")}%')
+              "
+            displayName: Check SV threshold
+
+          - script: |
+              python evaluation/audit_agent.py \
+                --environment dev \
+                --git-sha $(Build.SourceVersion) \
+                --git-branch main \
+                --timeout 600 \
+                --output agent_eval_results.json
+            displayName: Evaluate agent (gate)
+
+          - script: |
+              python -c "
+              import json, sys
+              with open('agent_eval_results.json') as f:
+                  r = json.load(f)
+              if not r.get('passed_threshold'):
+                  print(f'GATE FAILED: Agent avg {r.get(\"overall_average\", 0):.3f}')
+                  sys.exit(1)
+              print(f'GATE PASSED: Agent avg {r.get(\"overall_average\", 0):.3f}')
+              "
+            displayName: Check agent threshold
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathToPublish: .
+              artifactName: eval-results
+              publishLocation: Container
+            condition: always()
+
+  - stage: Deploy
+    displayName: Deploy to PROD
+    dependsOn: Evaluate
+    condition: succeeded()
+    jobs:
+      - deployment: DeployToProd
+        displayName: Deploy objects to PROD
+        environment: production
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - task: ConfigureSnowflakeCLI@0
+                  inputs:
+                    configFilePath: './ci/azure/config.toml'
+                    cliVersion: 'latest'
+                    useWorkloadIdentity: true
+                    connectedServiceName: 'snowflake-wif-connection'
+                  displayName: Configure Snowflake CLI (OIDC)
+
+                - task: UsePythonVersion@0
+                  inputs:
+                    versionSpec: '3.11'
+
+                - script: pip install -r requirements.txt
+                  displayName: Install dependencies
+
+                - script: python setup/deploy.py --target all --environment prod
+                  displayName: Deploy semantic views + agents to PROD

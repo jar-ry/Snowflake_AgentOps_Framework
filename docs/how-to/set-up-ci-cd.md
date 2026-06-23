@@ -1,95 +1,162 @@
-# CI/CD pipeline
+# Set Up CI/CD
 
-> Status: Stable | Last reviewed: 2026-06-21 | Audience: Engineers, platform/DevOps
+This guide covers setting up CI/CD for the AgentOps framework using **GitHub Actions** or **Azure DevOps**.
 
-**Purpose.** Document the framework's vendor-neutral CI/CD pipeline — the stages every semantic view or agent change passes through, the scripts that implement them, and how to wire them into any CI system.
+Both use OIDC (workload identity federation) — no long-lived secrets, no private keys.
 
-This framework is **CI/CD-stack agnostic**. The pipeline logic lives in Python scripts under `evaluation/` and `setup/`; the CI YAML files are just orchestration wrappers that call those scripts.
+## Architecture
 
-## Pipeline stages
-
-Every semantic view or agent change should pass through these stages:
-
-### Stage 1: Audit (structural, free)
-```bash
-python evaluation/audit_semantic_view.py --environment dev --ddl-file <path-to-yaml>
 ```
-- Runs 6 structural checks (documentation, naming, relationships, metrics, etc.)
-- Zero cost — no LLM calls, just YAML parsing
-- **Gate**: Must pass to proceed
-
-### Stage 2: Evaluate (LLM-judged accuracy)
-```bash
-python evaluation/evaluate_semantic_view.py --environment dev --semantic-view DB.SCHEMA.MY_SV
+  Feature Branch / PR          main branch
+  ─────────────────           ──────────────
+        │                          │
+   CI: Evaluate                CD: Evaluate → Gate → Deploy
+   against DEV                 against DEV, then deploy to PROD
+        │                          │
+   Post results                Only if quality gates pass
+   as PR comment               → PROD database
 ```
-- Runs question bank against the semantic view via Cortex Analyst
-- LLM-as-a-judge scores each result
-- Reports accuracy percentage by difficulty category
-- **Gate**: Must exceed threshold defined in `config/thresholds.yaml`
 
-### Stage 3: Agent evaluation (native GPA)
-```bash
-python evaluation/audit_agent.py --environment dev --agent-name DB.SCHEMA.MY_AGENT
+**Key principle**: Only the CD pipeline (triggered by merges to `main`) can deploy to the PROD database. Human developers have read-only access to PROD.
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `.github/workflows/ci.yml` | GitHub Actions CI (PRs + branch pushes) |
+| `.github/workflows/cd.yml` | GitHub Actions CD (merge to main → deploy) |
+| `ci/azure/ci-pipeline.yml` | Azure DevOps CI |
+| `ci/azure/cd-pipeline.yml` | Azure DevOps CD |
+| `ci/azure/config.toml` | Snowflake CLI config for Azure (no credentials) |
+| `config/deployment.yaml` | Controls where objects are deployed per environment |
+| `setup/cicd_setup.sql` | Creates the service user, role, and grants |
+| `setup/deploy.py` | Deployment script (vendor-neutral) |
+
+## Option A: GitHub Actions (OIDC)
+
+### 1. Run the Snowflake setup SQL
+
+Fill in the placeholders in `setup/cicd_setup.sql` and execute with ACCOUNTADMIN:
+
+```sql
+-- Key values to replace:
+-- {{GITHUB_REPO}}      → your-org/your-repo
+-- {{PROD_DATABASE}}    → your prod database name
+-- {{DEV_DATABASE}}     → your dev database name
+-- {{SV_SCHEMA}}        → ANALYTICS (or your schema)
+-- {{AGENT_SCHEMA}}     → AI (or your schema)
+-- {{FRAMEWORK_DB}}     → same as dev or separate ops db
+-- {{FRAMEWORK_SCHEMA}} → AGENTOPS
+-- {{WAREHOUSE}}        → your warehouse
 ```
-- Uses Snowflake's native `EXECUTE_AI_EVALUATION` with built-in GPA metrics
-- Scores up to 8 metrics by default — built-in (`answer_correctness`, `logical_consistency`) plus custom LLM-judged (`safety`, `groundedness`, `execution_efficiency`, `answer_relevance`, `conciseness`, `pii_leakage`). The active set is configurable per environment via `thresholds.yaml` (`agent.<env>.metrics`); see [Pillar 2: Output evaluation](../explanation/pillar-2-output-evaluation.md).
-- **Gate**: Must exceed per-metric thresholds
 
-### Stage 4: Deploy (promote to production)
+This creates:
+- `CICD_DEPLOY_ROLE` — only role with CREATE on prod
+- `github_cicd_user` — TYPE=SERVICE user with OIDC workload identity
+
+### 2. Set the GitHub repository secret
+
+Only ONE secret is needed (OIDC handles auth):
+
 ```bash
-python setup/deploy.py --target semantic_view --environment prod
-python setup/deploy.py --target agent --environment prod
+gh secret set SNOWFLAKE_ACCOUNT --body "YOUR_ACCOUNT_IDENTIFIER"
 ```
-- Only runs after all gates pass on merge to main
-- Deploys the semantic view YAML or agent SQL to the production environment
 
-## Wiring into your CI system
+### 3. OIDC subject scoping
 
-The scripts above are the interface. Your CI system just needs to:
-1. Check out the repo
-2. Install dependencies: `pip install -r requirements.txt`
-3. Set environment variables for Snowflake auth:
-   - `SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER`, `SNOWFLAKE_PRIVATE_KEY` (key-pair auth, recommended)
-   - Or `SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER`, `SNOWFLAKE_PASSWORD` (password auth)
-4. Run the scripts in order, failing the pipeline if any exit non-zero
+The service user's SUBJECT claim controls which workflows can authenticate:
 
-### GitHub Actions
-This repo's own workflows in [`.github/workflows/`](../../.github/workflows/) are the reference implementation — `agent_ci.yml`, `agent_cd.yml`, `semantic_view_ci.yml`, and `semantic_view_cd.yml`. Adapt them in place, or copy them into your own repo.
+| Scope | SUBJECT value |
+|-------|---------------|
+| Only main branch (CD) | `repo:org/repo:ref:refs/heads/main` |
+| Any branch (CI + CD) | `repo:org/repo:*` |
+| Specific environment | `repo:org/repo:environment:production` |
 
-### GitLab CI
+For CI (PRs/branches) to also authenticate, you may need a broader subject or a second service user. The current setup restricts deployment to main-only.
+
+### 4. How it works
+
+**On PR / branch push** → `ci.yml` runs:
+1. Authenticates via OIDC as `github_cicd_user`
+2. Evaluates semantic views + agents against DEV
+3. Posts results as a PR comment
+
+**On merge to main** → `cd.yml` runs:
+1. Evaluates against DEV (quality gate)
+2. If thresholds pass → deploys to PROD via `setup/deploy.py`
+3. Uploads results as artifacts
+
+## Option B: Azure DevOps (OIDC)
+
+### 1. Create Azure Entra ID App Registration
+
+1. Azure Portal → Entra ID → App registrations → New
+2. Note the **Application (client) ID** and **Tenant ID**
+3. Certificates & secrets → Federated credentials → Add:
+   - Issuer: `https://vstoken.dev.azure.com/<tenant-id>`
+   - Subject: `sc://<org>/<project>/<service-connection>`
+   - Audience: `api://AzureADTokenExchange`
+
+### 2. Create Azure DevOps service connection
+
+1. Project Settings → Service connections → New → Azure Resource Manager
+2. Select "Workload Identity federation (manual)"
+3. Name: `snowflake-wif-connection` (must match pipeline YAML)
+
+### 3. Run the Snowflake setup SQL
+
+Uncomment the Azure DevOps section in `setup/cicd_setup.sql` and fill in:
+- `{{AZURE_TENANT_ID}}`
+- `{{ADO_ORG}}`
+- `{{ADO_PROJECT}}`
+- `{{ADO_SERVICE_CONN}}`
+
+### 4. Set pipeline variables
+
+Add `SNOWFLAKE_ACCOUNT` as a variable in your pipeline or variable group.
+
+### 5. Import the pipelines
+
+Point Azure DevOps at:
+- `ci/azure/ci-pipeline.yml` for CI
+- `ci/azure/cd-pipeline.yml` for CD
+
+## Deployment Config
+
+`config/deployment.yaml` maps environments to Snowflake locations:
+
 ```yaml
-stages: [audit, evaluate, deploy]
+environments:
+  dev:
+    database: BABY_MART_DEMO
+    semantic_view_schema: ANALYTICS
+    agent_schema: AI
+    warehouse: RETAIL_AI_EVAL_WH
 
-audit-sv:
-  stage: audit
-  script:
-    - pip install -r requirements.txt
-    - python evaluation/audit_semantic_view.py --environment dev
-
-evaluate-sv:
-  stage: evaluate
-  script:
-    - python evaluation/evaluate_semantic_view.py --environment dev
-  rules:
-    - changes: ["question_banks/semantic_view/**", "evaluation/**"]
-
-deploy-prod:
-  stage: deploy
-  script:
-    - python setup/deploy.py --target semantic_view --environment prod
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
+  prod:
+    database: BABY_MART_PROD
+    semantic_view_schema: ANALYTICS
+    agent_schema: AI
+    warehouse: RETAIL_AI_EVAL_WH
 ```
 
-### Azure DevOps / Other
-Follow the same pattern: install deps, set env vars, run scripts sequentially.
+The deploy script reads this to rewrite FQNs when deploying from dev → prod.
 
-## Environment variables
+## Prod-Only Enforcement
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `SNOWFLAKE_ACCOUNT` | Yes (CI) | Snowflake account identifier |
-| `SNOWFLAKE_USER` | Yes (CI) | Service account username |
-| `SNOWFLAKE_PRIVATE_KEY` | Recommended | Base64-encoded PKCS8 private key |
-| `SNOWFLAKE_PASSWORD` | Alternative | Password (if not using key-pair) |
-| `SNOWFLAKE_ROLE` | Optional | Role to use (defaults to user's default role) |
+The security model ensures only CI/CD can write to prod:
+
+1. `CICD_DEPLOY_ROLE` is the **only** role with `CREATE SEMANTIC VIEW` and `CREATE AGENT` on the prod database
+2. This role is granted **only** to the service users (`github_cicd_user` / `ado_cicd_user`)
+3. The OIDC subject is scoped to `refs/heads/main` — only merges trigger deployment
+4. Developer roles have `USAGE` + `SELECT` on prod (read-only)
+
+## Troubleshooting
+
+| Issue | Fix |
+|-------|-----|
+| OIDC token fails | Ensure `permissions: id-token: write` is in your workflow |
+| Subject mismatch | Check the exact subject claim format (see GitHub/Azure docs) |
+| `snow: command not found` | The Snowflake action must run before any `snow` commands |
+| Prod deploy blocked | Only merges to `main` trigger `cd.yml` |
+| Eval scripts can't connect | Service user needs grants on dev + framework schemas |

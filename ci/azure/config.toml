@@ -1,0 +1,6 @@
+# Snowflake CLI config for Azure DevOps pipelines.
+# Credentials are injected via OIDC / environment variables — never stored here.
+
+default_connection_name = "default"
+
+[connections.default]
