@@ -1,7 +1,7 @@
 """
 deploy.py — Deploy semantic views and agents to a target environment.
 
-Reads config/deployment.yaml to determine the target database/schema,
+Reads config/environments.yaml to determine the target database/schema,
 then executes the DDL via `snow sql` (compatible with OIDC auth).
 
 Usage:
@@ -18,15 +18,8 @@ import yaml
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def load_deployment_config() -> dict:
-    path = os.path.join(PROJECT_ROOT, "config", "deployment.yaml")
-    if not os.path.exists(path):
-        sys.exit(f"ERROR: {path} not found. Run the bootstrap skill first.")
-    with open(path) as f:
-        return yaml.safe_load(f)
-
-
-def load_environments_config() -> dict:
+def load_config() -> dict:
+    """Load the single config file: config/environments.yaml."""
     path = os.path.join(PROJECT_ROOT, "config", "environments.yaml")
     if not os.path.exists(path):
         sys.exit(f"ERROR: {path} not found. Run the bootstrap skill first.")
@@ -142,22 +135,22 @@ def main():
                         help="Use named connection instead of temp (-x) connection")
     args = parser.parse_args()
 
-    deploy_cfg = load_deployment_config()
-    env_cfg = load_environments_config()
+    cfg = load_config()
     use_temp = not args.named_connection
+    env = cfg["environments"][args.environment]
 
     print(f"\n{'='*60}")
     print(f"  Deploying to {args.environment.upper()}")
-    print(f"  Target: {deploy_cfg['environments'][args.environment]}")
+    print(f"  Target: {env}")
     print(f"{'='*60}\n")
 
     if args.target in ("semantic_view", "all"):
         print("Deploying semantic views...")
-        deploy_semantic_views(deploy_cfg, env_cfg, args.environment, use_temp)
+        deploy_semantic_views(cfg, cfg, args.environment, use_temp)
 
     if args.target in ("agent", "all"):
         print("Deploying agents...")
-        deploy_agents(deploy_cfg, env_cfg, args.environment, use_temp)
+        deploy_agents(cfg, cfg, args.environment, use_temp)
 
     print(f"\nDeployment to {args.environment.upper()} complete.")
 
