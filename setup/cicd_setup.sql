@@ -18,6 +18,10 @@
 --   {{ADO_ORG}}         — Azure DevOps org name (for Azure DevOps only)
 --   {{ADO_PROJECT}}     — Azure DevOps project name (for Azure DevOps only)
 --   {{ADO_SERVICE_CONN}}— Azure DevOps service connection name
+--
+-- NOTE: {{DEV_DATABASE}} / {{PROD_DATABASE}} here MUST match the
+-- environments.dev.database / environments.prod.database values in
+-- config/environments.yaml (the single deploy-target config).
 -- ============================================================================
 
 USE ROLE ACCOUNTADMIN;

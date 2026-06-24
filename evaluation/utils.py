@@ -248,6 +248,33 @@ def get_agents(environment: str = "dev") -> list:
     return [{"fqn": fqn, "short_name": short, "semantic_views": [sv_fqn] if sv_fqn else []}] if fqn else []
 
 
+def get_deploy_target(environment: str = "dev") -> dict:
+    """Return the deploy target for an environment: {"database", "warehouse"}.
+
+    Single source of config: this reads config/environments.yaml only — there is
+    NO separate config/deployment.yaml. The deploy target database is per
+    environment (e.g. dev -> DEV_DB, prod -> PROD_DB); object schemas come from
+    each object's own FQN, not from separate *_schema keys. Warehouse falls back
+    to the framework warehouse when not set on the environment.
+    """
+    config = load_config()
+    environments = config.get("environments", {})
+    if environment not in environments:
+        raise SystemExit(
+            f"ERROR: environment '{environment}' not found in config/environments.yaml"
+        )
+    env = environments[environment] or {}
+    database = env.get("database")
+    if not database:
+        raise SystemExit(
+            f"ERROR: no deploy target database for environment '{environment}'. "
+            f"Add `database:` under environments.{environment} in config/environments.yaml."
+        )
+    warehouse = env.get("warehouse") or get_framework_config().get("warehouse", "")
+    return {"database": database, "warehouse": warehouse}
+
+
+
 @functools.lru_cache(maxsize=None)
 def _load_thresholds_cached(cfg_dir: str) -> dict:
     return _read_yaml(os.path.join(cfg_dir, "thresholds.yaml"))

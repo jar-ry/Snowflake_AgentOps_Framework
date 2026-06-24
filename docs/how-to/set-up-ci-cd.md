@@ -28,7 +28,7 @@ Both use OIDC (workload identity federation) — no long-lived secrets, no priva
 | `ci/azure/ci-pipeline.yml` | Azure DevOps CI |
 | `ci/azure/cd-pipeline.yml` | Azure DevOps CD |
 | `ci/azure/config.toml` | Snowflake CLI config for Azure (no credentials) |
-| `config/deployment.yaml` | Controls where objects are deployed per environment |
+| `config/environments.yaml` | Single config: governed objects + per-environment deploy target (`database`/`warehouse`) |
 | `setup/cicd_setup.sql` | Creates the service user, role, and grants |
 | `setup/deploy.py` | Deployment script (vendor-neutral) |
 
@@ -123,24 +123,35 @@ Point Azure DevOps at:
 
 ## Deployment Config
 
-`config/deployment.yaml` maps environments to Snowflake locations:
+There is a single config file — `config/environments.yaml`. Objects are defined
+ONCE under `dev` (the source of truth); each environment carries its own deploy
+**target** (`database` + `warehouse`). Object schemas come from each object's own
+FQN, so there are no separate `*_schema` keys.
 
 ```yaml
 environments:
   dev:
-    database: BABY_MART_DEMO
-    semantic_view_schema: ANALYTICS
-    agent_schema: AI
+    database: BABY_MART_DEMO     # deploy target for dev
     warehouse: RETAIL_AI_EVAL_WH
-
+    semantic_views:
+      - fqn: BABY_MART_DEMO.ANALYTICS.CATEGORY_VIEW
+        short_name: category
+    agents:
+      - fqn: BABY_MART_DEMO.AI.RETAIL_AGENT
+        short_name: retail
+        semantic_views:
+          - BABY_MART_DEMO.ANALYTICS.CATEGORY_VIEW
   prod:
-    database: BABY_MART_PROD
-    semantic_view_schema: ANALYTICS
-    agent_schema: AI
+    database: BABY_MART_PROD     # deploy target for prod (release promotion)
     warehouse: RETAIL_AI_EVAL_WH
+    semantic_views: []           # empty = promote the dev objects as-is
+    agents: []
 ```
 
-The deploy script reads this to rewrite FQNs when deploying from dev → prod.
+On release, `setup/deploy.py --environment prod` retargets the dev objects to
+`prod.database` (DB-level retarget; schema is preserved). Use `--dry-run` to
+print the resolved target and the objects that would be deployed without
+touching Snowflake.
 
 ## Prod-Only Enforcement
 

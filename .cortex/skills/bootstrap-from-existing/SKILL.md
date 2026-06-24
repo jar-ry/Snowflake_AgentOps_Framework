@@ -122,6 +122,8 @@ framework:
 
 environments:
   dev:
+    database: <chosen_database>      # deploy target for dev (the objects' own DB)
+    warehouse: <chosen_warehouse>
     semantic_views:
       - fqn: <SV_1_FQN>
         short_name: <SV_1_NAME>   # just the object name portion
@@ -138,6 +140,8 @@ environments:
       # ... for each selected agent
 
   prod:
+    database: <chosen_prod_database>  # deploy target for prod (set when CI/CD promotion is configured; may equal dev DB until then)
+    warehouse: <chosen_warehouse>
     semantic_views: []
     agents: []
 
