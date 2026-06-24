@@ -120,3 +120,4 @@ pricing:
       input_credits_per_million: 6.50
       output_credits_per_million: 29.25
       cache_read_credits_per_million: 0.65
+# trigger
