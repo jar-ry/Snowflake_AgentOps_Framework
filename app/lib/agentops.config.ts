@@ -9,5 +9,5 @@
 // targets its own schema.
 //
 // Runtime env vars SNOWFLAKE_DATABASE / SNOWFLAKE_SCHEMA override these.
-export const FRAMEWORK_DB = ""
-export const FRAMEWORK_SCHEMA = ""
+export const FRAMEWORK_DB = "FINANCE_AI_DEV"
+export const FRAMEWORK_SCHEMA = "AGENTOPS"

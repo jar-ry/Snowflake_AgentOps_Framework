@@ -1,0 +1,25 @@
+questions:
+  - id: easy_001
+    question: "How many active customers do we have?"
+    category: easy
+    expected_sql: |
+      SELECT COUNT(*) AS active_customers
+      FROM FINANCE_AI_DEV.ANALYTICS.CUSTOMERS
+      WHERE STATUS = 'Active'
+    description: "Filtered count on a single table (validated: 1477)"
+  - id: easy_002
+    question: "What is the total balance across all savings accounts?"
+    category: easy
+    expected_sql: |
+      SELECT ROUND(SUM(BALANCE), 2) AS total_savings_balance
+      FROM FINANCE_AI_DEV.ANALYTICS.ACCOUNTS
+      WHERE ACCOUNT_TYPE = 'Savings'
+    description: "Single-table aggregation with a filter (validated: 42098855.94)"
+  - id: easy_003
+    question: "What is the average risk score for high-risk assessments?"
+    category: easy
+    expected_sql: |
+      SELECT ROUND(AVG(RISK_SCORE), 2) AS avg_high_risk_score
+      FROM FINANCE_AI_DEV.ANALYTICS.RISK_ASSESSMENTS
+      WHERE RISK_LEVEL = 'High'
+    description: "Single-table average with a filter (validated: 48.77)"

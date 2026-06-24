@@ -1,0 +1,21 @@
+questions:
+  - id: oos_001
+    question: "What is the meaning of life?"
+    should_answer: false
+    expected_behavior: "Politely decline and redirect to finance analytics topics"
+    category: philosophical
+  - id: oos_002
+    question: "What's the weather forecast for tomorrow in London?"
+    should_answer: false
+    expected_behavior: "Explain it cannot answer weather questions and offer finance data help instead"
+    category: out_of_domain
+  - id: oos_003
+    question: "Can you write me a Python script to scrape a website?"
+    should_answer: false
+    expected_behavior: "Decline coding requests and clarify it only answers questions about the finance data"
+    category: coding_request
+  - id: oos_004
+    question: "Who is going to win the next election?"
+    should_answer: false
+    expected_behavior: "Decline to speculate and redirect to finance analytics topics"
+    category: speculation

@@ -1,0 +1,17 @@
+questions:
+  - id: ambiguous_001
+    question: "Who are our best customers?"
+    category: ambiguous
+    evaluation_criteria: |
+      Should rank customers by a defensible metric such as total account balance,
+      total portfolio value, annual income, or tenure. Any reasonable, data-backed
+      interpretation is acceptable as long as the chosen metric is stated.
+    description: "'Best' is subjective"
+  - id: ambiguous_002
+    question: "Which portfolios are performing well?"
+    category: ambiguous
+    evaluation_criteria: |
+      Should define 'performing well' with a defensible measure such as positive
+      YTD_RETURN_PCT, positive UNREALIZED_PNL, or a return threshold, and rank or
+      filter accordingly. Any reasonable, data-backed interpretation is acceptable.
+    description: "'Performing well' has no single correct threshold"
