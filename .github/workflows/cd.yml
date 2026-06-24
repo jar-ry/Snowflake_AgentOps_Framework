@@ -9,9 +9,9 @@ on:
       - 'question_banks/**'
       - 'config/**'
       - 'evaluation/**'
+      - '.github/workflows/cd.yml'
 
 permissions:
-  id-token: write      # Required for OIDC token generation
   contents: read
 
 jobs:
@@ -19,42 +19,77 @@ jobs:
     name: "Evaluate → Gate → Deploy to PROD"
     runs-on: ubuntu-latest
 
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+      SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+      SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+      SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+      SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Install and configure Snowflake CLI (OIDC)
+      - name: Install Snowflake CLI
         uses: snowflakedb/snowflake-actions@v2.0.4
         with:
-          use-oidc: true
           cli-version: "3.16"
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
 
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Configure Snowflake connection
+        run: |
+          mkdir -p ~/.snowflake
+          if [ -n "$SNOWFLAKE_PRIVATE_KEY" ]; then
+            echo "$SNOWFLAKE_PRIVATE_KEY" > ~/.snowflake/ci_rsa_key.p8
+            chmod 600 ~/.snowflake/ci_rsa_key.p8
+            cat > ~/.snowflake/connections.toml << EOF
+          [default]
+          account = "${SNOWFLAKE_ACCOUNT}"
+          user = "${SNOWFLAKE_USER}"
+          authenticator = "SNOWFLAKE_JWT"
+          private_key_file = "/home/runner/.snowflake/ci_rsa_key.p8"
+          role = "${SNOWFLAKE_ROLE}"
+          warehouse = "${SNOWFLAKE_WAREHOUSE}"
+          database = "${SNOWFLAKE_DATABASE}"
+          EOF
+          elif [ -n "$SNOWFLAKE_PASSWORD" ]; then
+            cat > ~/.snowflake/connections.toml << EOF
+          [default]
+          account = "${SNOWFLAKE_ACCOUNT}"
+          user = "${SNOWFLAKE_USER}"
+          password = "${SNOWFLAKE_PASSWORD}"
+          role = "${SNOWFLAKE_ROLE}"
+          warehouse = "${SNOWFLAKE_WAREHOUSE}"
+          database = "${SNOWFLAKE_DATABASE}"
+          EOF
+          else
+            echo "::error::No auth secret provided. Set SNOWFLAKE_PRIVATE_KEY or SNOWFLAKE_PASSWORD in repo secrets."
+            exit 1
+          fi
+          chmod 600 ~/.snowflake/connections.toml
+
       - name: Verify Snowflake connection
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: github_cicd_user
-        run: snow connection test -x
+        run: snow connection test
 
       # --- Quality Gate: Evaluate against DEV ---
       - name: Evaluate semantic view (quality gate)
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: github_cicd_user
         run: |
           python evaluation/evaluate_semantic_view.py \
             --environment dev \
             --categories easy,hard,ambiguous \
-            --git-sha ${{ github.sha }} \
+            --git-sha "${{ github.sha }}" \
             --git-branch main \
             --output sv_eval_results.json
 
@@ -72,13 +107,10 @@ jobs:
           "
 
       - name: Evaluate agent (quality gate)
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: github_cicd_user
         run: |
           python evaluation/audit_agent.py \
             --environment dev \
-            --git-sha ${{ github.sha }} \
+            --git-sha "${{ github.sha }}" \
             --git-branch main \
             --timeout 600 \
             --output agent_eval_results.json
@@ -98,15 +130,9 @@ jobs:
 
       # --- Deploy to PROD ---
       - name: Deploy semantic views to PROD
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: github_cicd_user
         run: python setup/deploy.py --target semantic_view --environment prod
 
       - name: Deploy agents to PROD
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: github_cicd_user
         run: python setup/deploy.py --target agent --environment prod
 
       - name: Upload results
