@@ -195,7 +195,7 @@ $$;
 ```
 Write to `agents/<short_name_lowercase>.sql`. Add a header comment noting it was reconstructed from DESCRIBE AGENT output.
 
-These files are referenced by the `sql_path` field in `config/environments.yaml`. When a developer changes the semantic view or agent, they update the SQL file, commit it, and the CI pipeline can diff against the previous version to detect regressions.
+These `.sql` files are the lossless, deployable definitions (SV from `GET_DDL`; agent reconstructed from `DESCRIBE AGENT`). `setup/deploy.py` discovers them by the `<short_name_lowercase>.sql` convention — there is no `sql_path` config field. When a developer changes the semantic view or agent, they update the `.sql`, commit it, and the CI pipeline diffs against the previous version to detect regressions.
 
 ### Step 5: Create Framework Tables
 

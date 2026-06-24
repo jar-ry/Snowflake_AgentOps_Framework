@@ -13,9 +13,10 @@ Usage:
     python setup/deploy.py --target all --environment prod
     python setup/deploy.py --target all --environment prod --dry-run
 
-NOTE: object acquisition (YAML->DDL) and SQL execution are still the original
-mechanics and are addressed in follow-up work (PR2: single lossless .sql format;
-PR3: safe DB retarget + file-based execution). PR1 only consolidates config.
+Semantic views and agents are stored as lossless .sql files (SV from GET_DDL,
+agent reconstructed from DESCRIBE AGENT) and deployed verbatim. SQL execution is
+still the original `snow sql -q` mechanic and is addressed in PR3 (file-based
+execution + safe DB retarget).
 """
 import argparse
 import os
@@ -54,22 +55,6 @@ def run_sql(sql: str, use_temp_connection: bool = True) -> str:
     return result.stdout
 
 
-def generate_sv_ddl(yaml_path: str) -> str:
-    """Convert a semantic view YAML to DDL using generate_ddl.py.
-
-    PR2 will replace this with lossless .sql stored from GET_DDL.
-    """
-    script = os.path.join(PROJECT_ROOT, "semantic_views", "generate_ddl.py")
-    result = subprocess.run(
-        [sys.executable, script, yaml_path],
-        capture_output=True, text=True
-    )
-    if result.returncode != 0:
-        print(f"DDL generation failed:\n{result.stderr}", file=sys.stderr)
-        sys.exit(1)
-    return result.stdout
-
-
 def rewrite_fqn(ddl: str, original_db: str, original_schema: str,
                 target_db: str, target_schema: str) -> str:
     """Rewrite the FQN in DDL to point to the target environment.
@@ -98,13 +83,14 @@ def deploy_semantic_views(environment: str, target: dict,
             deployed.append(target_fqn)
             continue
 
-        # File discovery by bootstrap convention (format handled in PR2).
-        fname = f"{sv['short_name'].lower()}.yaml"
+        # Lossless .sql from GET_DDL (bootstrap convention: <short_name>.sql).
+        fname = f"{sv['short_name'].lower()}.sql"
         path = os.path.join(sv_dir, fname)
         if not os.path.exists(path):
             print(f"  SKIP (file not found): {path}", file=sys.stderr)
             continue
-        ddl = generate_sv_ddl(path)
+        with open(path) as f:
+            ddl = f.read().strip().rstrip(";")
         if environment != "dev":
             ddl = rewrite_fqn(ddl, src_db, schema, target_db, schema)
         run_sql(ddl, use_temp_connection=use_temp)

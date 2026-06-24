@@ -1,0 +1,25 @@
+-- Semantic View Template
+-- Copy this file and rename to match your semantic view (e.g. my_analytics_view.sql).
+-- The bootstrap-from-existing skill generates this automatically from
+-- GET_DDL('SEMANTIC VIEW', '<fqn>'), so the real file is the exact, lossless DDL.
+--
+-- Deploy with: python setup/deploy.py --target semantic_view --environment <env>
+
+CREATE OR REPLACE SEMANTIC VIEW DATABASE.SCHEMA.YOUR_SEMANTIC_VIEW_NAME
+  TABLES (
+    YOUR_TABLE AS DATABASE.SCHEMA.SOURCE_TABLE
+      PRIMARY KEY (ID)
+  )
+  RELATIONSHIPS (
+    -- e.g. ORDERS (CUSTOMER_ID) REFERENCES CUSTOMERS (ID)
+  )
+  FACTS (
+    -- e.g. YOUR_TABLE.AMOUNT AS amount
+  )
+  DIMENSIONS (
+    YOUR_TABLE.NAME AS name COMMENT = 'Human-readable description of this dimension'
+  )
+  METRICS (
+    -- e.g. YOUR_TABLE.TOTAL AS SUM(YOUR_TABLE.amount) COMMENT = 'Total amount'
+  )
+  COMMENT = 'Description of your semantic view';
