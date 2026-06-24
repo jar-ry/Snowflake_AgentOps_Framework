@@ -19,7 +19,7 @@ on:
       - 'evaluation/**'
 
 permissions:
-  id-token: write      # Required for OIDC token generation
+  id-token: write      # Required for OIDC (ignored when using password auth)
   contents: read
   pull-requests: write
 
@@ -28,14 +28,25 @@ jobs:
     name: "Evaluate against DEV"
     runs-on: ubuntu-latest
 
+    env:
+      # All Snowflake connection details are parameterized via repo secrets.
+      # Required: SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER
+      # Auth (one of): SNOWFLAKE_PASSWORD  OR  SNOWFLAKE_PRIVATE_KEY
+      # Optional: SNOWFLAKE_ROLE, SNOWFLAKE_WAREHOUSE, SNOWFLAKE_DATABASE
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+      SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+      SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+      SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install and configure Snowflake CLI (OIDC)
+      - name: Install Snowflake CLI
         uses: snowflakedb/snowflake-actions@v2.0.4
         with:
-          use-oidc: true
           cli-version: "3.16"
 
       - name: Set up Python
@@ -46,16 +57,24 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Configure Snowflake connection
+        run: |
+          mkdir -p ~/.snowflake
+          cat > ~/.snowflake/connections.toml << EOF
+          [default]
+          account = "${SNOWFLAKE_ACCOUNT}"
+          user = "${SNOWFLAKE_USER}"
+          password = "${SNOWFLAKE_PASSWORD}"
+          role = "${SNOWFLAKE_ROLE}"
+          warehouse = "${SNOWFLAKE_WAREHOUSE}"
+          database = "${SNOWFLAKE_DATABASE}"
+          EOF
+          chmod 600 ~/.snowflake/connections.toml
+
       - name: Verify Snowflake connection
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: github_cicd_user
-        run: snow connection test -x
+        run: snow connection test
 
       - name: Run semantic view evaluation
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: github_cicd_user
         run: |
           BRANCH="${{ github.head_ref || github.ref_name }}"
           python evaluation/evaluate_semantic_view.py \
@@ -66,9 +85,6 @@ jobs:
             --output sv_eval_results.json || true
 
       - name: Run agent evaluation
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: github_cicd_user
         run: |
           BRANCH="${{ github.head_ref || github.ref_name }}"
           python evaluation/audit_agent.py \
