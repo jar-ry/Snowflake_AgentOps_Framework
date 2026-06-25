@@ -1,6 +1,10 @@
 import type { Metadata } from "next"
 import "./globals.css"
-import Link from "next/link"
+import { ThemeProvider } from "./components/core/theme-provider"
+import { DashboardShell } from "./components/layout/dashboard-shell"
+import { getEnvironments } from "@/lib/environments"
+
+export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
   title: "AgentOps Monitoring",
@@ -8,36 +12,16 @@ export const metadata: Metadata = {
   icons: { icon: "/icon.svg" },
 }
 
-function Nav() {
-  const links = [
-    { href: "/", label: "Overview" },
-    { href: "/accuracy", label: "Accuracy" },
-    { href: "/quality", label: "Quality" },
-    { href: "/cost", label: "Cost" },
-    { href: "/alerts", label: "Alerts" },
-  ]
-  return (
-    <nav className="nav">
-      {links.map((l) => (
-        <Link key={l.href} href={l.href} className="nav-link">
-          {l.label}
-        </Link>
-      ))}
-    </nav>
-  )
-}
-
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const envOptions = await getEnvironments()
   return (
     <html lang="en">
       <body>
-        <header className="header">
-          <h1 className="header-title">AgentOps Monitoring</h1>
-          <Nav />
-        </header>
-        <main className="page">{children}</main>
+        <ThemeProvider>
+          <DashboardShell envOptions={envOptions}>{children}</DashboardShell>
+        </ThemeProvider>
       </body>
     </html>
   )
