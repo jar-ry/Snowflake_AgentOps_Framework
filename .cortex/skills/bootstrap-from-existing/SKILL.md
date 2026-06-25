@@ -174,28 +174,22 @@ export const FRAMEWORK_SCHEMA = "<chosen_schema>"
 
 Use the same `<chosen_database>` and `<chosen_schema>` selected in Step 3 (they must match `framework.database` / `framework.schema` in `config/environments.yaml`). Without this, the deployed dashboard fails every query with `Object '...' does not exist or not authorized`.
 
-#### Also extract and version-control object DDL
+#### Also extract and version-control object definitions (YAML)
 
-The framework tracks changes to semantic views and agents via git. Pull the current DDL for each governed object into the repo so diffs are visible in PRs.
+The framework tracks changes to semantic views and agents via git as `.yaml` files. Pull the current definition for each governed object into the repo so diffs are visible in PRs.
 
 **For each selected semantic view:**
 ```sql
-SELECT GET_DDL('SEMANTIC VIEW', '<sv_fqn>') AS ddl;
+SELECT SYSTEM$READ_YAML_FROM_SEMANTIC_VIEW('<sv_fqn>') AS yaml;
 ```
-Write the result to `semantic_views/<short_name_lowercase>.sql`. Add a header comment with the FQN and note it was pulled from Snowflake.
+Write the result to `semantic_views/<short_name_lowercase>.yaml`. This is the complete, lossless native YAML that Snowsight uses — it includes tables, relationships, dimensions, facts, metrics, verified queries, and all other properties. No conversion needed.
 
 **For each selected agent:**
-`GET_DDL` does not support the `AGENT` type. Instead, reconstruct a `CREATE OR REPLACE AGENT` statement from the `agent_spec` JSON column returned by `DESCRIBE AGENT` (already fetched in Step 2). Format it as:
-```sql
-CREATE OR REPLACE AGENT <agent_fqn>
-  COMMENT = '<comment>'
-  SPEC = $$
-<agent_spec as YAML>
-$$;
-```
-Write to `agents/<short_name_lowercase>.sql`. Add a header comment noting it was reconstructed from DESCRIBE AGENT output.
+`DESCRIBE AGENT <agent_fqn>` returns the spec as JSON in the `agent_spec` column. Convert it to YAML (JSON is a subset of YAML, so this is lossless) using `yaml.safe_dump(json.loads(agent_spec), sort_keys=False)`.
 
-These files are referenced by the `sql_path` field in `config/environments.yaml`. When a developer changes the semantic view or agent, they update the SQL file, commit it, and the CI pipeline can diff against the previous version to detect regressions.
+Write the **pure spec YAML** (no SQL wrapper) to `agents/<short_name_lowercase>.yaml`. Do NOT wrap it in `CREATE OR REPLACE AGENT` — `deploy.py` handles the wrapping at deploy time using the FQN and COMMENT from `environments.yaml`.
+
+These `.yaml` files are the editable, diff-able definitions. When a developer changes the semantic view or agent (in Snowsight or directly in the file), they commit the updated `.yaml` and the CI pipeline evaluates it before deployment.
 
 ### Step 5: Create Framework Tables
 
