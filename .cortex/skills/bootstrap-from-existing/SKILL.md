@@ -122,6 +122,8 @@ framework:
 
 environments:
   dev:
+    database: <chosen_database>      # deploy target DB (usually the objects' own DB)
+    warehouse: <chosen_warehouse>    # warehouse used for deploys
     semantic_views:
       - fqn: <SV_1_FQN>
         short_name: <SV_1_NAME>   # just the object name portion
@@ -137,7 +139,9 @@ environments:
           - <bound_sv_fqn_2>
       # ... for each selected agent
 
-  prod:
+  prod:                            # deploy target for release promotion
+    database: <chosen_prod_database> # may equal the dev DB until a separate prod exists
+    warehouse: <chosen_warehouse>
     semantic_views: []
     agents: []
 
