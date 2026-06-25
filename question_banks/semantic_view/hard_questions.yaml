@@ -1,0 +1,28 @@
+questions:
+  - id: hard_001
+    question: "What is the total portfolio value by customer segment?"
+    category: hard
+    expected_sql: |
+      SELECT c.CUSTOMER_SEGMENT,
+             ROUND(SUM(p.TOTAL_VALUE), 2) AS total_portfolio_value
+      FROM FINANCE_AI_DEV.ANALYTICS.PORTFOLIOS p
+      JOIN FINANCE_AI_DEV.ANALYTICS.CUSTOMERS c
+        ON p.CUSTOMER_ID = c.CUSTOMER_ID
+      GROUP BY c.CUSTOMER_SEGMENT
+      ORDER BY total_portfolio_value DESC
+    description: "Two-table join with group-by (validated: 5 segments)"
+  - id: hard_002
+    question: "Which customers have the highest total account balances?"
+    category: hard
+    expected_sql: |
+      SELECT c.CUSTOMER_ID,
+             c.FIRST_NAME,
+             c.LAST_NAME,
+             ROUND(SUM(a.BALANCE), 2) AS total_balance
+      FROM FINANCE_AI_DEV.ANALYTICS.ACCOUNTS a
+      JOIN FINANCE_AI_DEV.ANALYTICS.CUSTOMERS c
+        ON a.CUSTOMER_ID = c.CUSTOMER_ID
+      GROUP BY c.CUSTOMER_ID, c.FIRST_NAME, c.LAST_NAME
+      ORDER BY total_balance DESC
+      LIMIT 10
+    description: "Two-table join, aggregate, rank top N (validated: 10 rows)"

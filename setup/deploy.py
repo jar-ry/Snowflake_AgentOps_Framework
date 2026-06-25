@@ -192,6 +192,7 @@ def main():
     cfg = load_config()
     target = get_deploy_target(cfg, args.environment)
     use_temp = not args.named_connection
+    env = cfg["environments"][args.environment]
 
     print(f"\n{'='*60}")
     print(f"  {'DRY RUN — ' if args.dry_run else ''}Deploying to {args.environment.upper()}")
