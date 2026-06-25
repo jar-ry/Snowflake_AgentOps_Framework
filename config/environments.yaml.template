@@ -44,9 +44,11 @@ environments:
       # Each entry has:
       #   fqn: fully qualified name (DATABASE.SCHEMA.AGENT_NAME)
       #   short_name: display name used in reports
+      #   comment: agent description (used in CREATE AGENT at deploy time)
       #   semantic_views: list of SV FQNs bound to this agent (resolved from DESCRIBE AGENT)
       - fqn: {{AGENT_FQN}}
         short_name: {{AGENT_SHORT_NAME}}
+        comment: "{{AGENT_COMMENT}}"
         semantic_views:
           - {{SV_FQN}}
 
