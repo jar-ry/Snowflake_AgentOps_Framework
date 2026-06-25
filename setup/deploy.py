@@ -183,15 +183,15 @@ def main():
     parser = argparse.ArgumentParser(description="Deploy objects to a Snowflake environment.")
     parser.add_argument("--target", required=True, choices=["semantic_view", "agent", "all"])
     parser.add_argument("--environment", required=True, choices=["dev", "prod"])
-    parser.add_argument("--named-connection", action="store_true",
-                        help="Use named connection instead of temp (-x) connection")
+    parser.add_argument("--temp-connection", action="store_true",
+                        help="Use -x temp connection (for OIDC). Default: use named connection from connections.toml")
     parser.add_argument("--dry-run", action="store_true",
                         help="Resolve targets and list objects without deploying")
     args = parser.parse_args()
 
     cfg = load_config()
     target = get_deploy_target(cfg, args.environment)
-    use_temp = not args.named_connection
+    use_temp = args.temp_connection
 
     print(f"\n{'='*60}")
     print(f"  {'DRY RUN — ' if args.dry_run else ''}Deploying to {args.environment.upper()}")
