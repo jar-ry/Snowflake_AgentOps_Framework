@@ -412,9 +412,13 @@ function queryWithPool(
   return pool.use(async (conn) => {
     // Force the framework schema — the OAuth `schema` connection option is
     // unreliable on the SPCS owner's-rights path, leaving CURRENT_SCHEMA null
-    // so unqualified object names fail to resolve.
-    const fqSchema = `${FRAMEWORK_DB}.${FRAMEWORK_SCHEMA}`
-    if (FRAMEWORK_DB && FRAMEWORK_SCHEMA) {
+    // so unqualified object names fail to resolve. Resolve env-var override
+    // first, then the bootstrap-populated agentops.config values; if neither is
+    // set (e.g. local dev via connections.toml) skip and rely on the session default.
+    const fqDb = process.env.SNOWFLAKE_DATABASE || FRAMEWORK_DB
+    const fqSchemaName = process.env.SNOWFLAKE_SCHEMA || FRAMEWORK_SCHEMA
+    if (fqDb && fqSchemaName) {
+      const fqSchema = `${fqDb}.${fqSchemaName}`
       await new Promise<void>((res, rej) =>
         conn.execute({
           sqlText: `USE SCHEMA ${fqSchema}`,

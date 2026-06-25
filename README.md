@@ -138,7 +138,7 @@ Deploy the Next.js dashboard to Snowflake:
 cd app && snow app setup --app-name="agentops-monitoring" && snow app deploy
 ```
 
-The dashboard shows: KPIs, accuracy trends, interaction quality flags, token costs, and active alerts — all filterable by agent.
+The dashboard shows: KPIs, accuracy trends, interaction quality flags, token costs, user feedback, and active alerts — filterable by agent, environment, and time window.
 
 ---
 
