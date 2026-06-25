@@ -2,10 +2,14 @@
 deploy.py — Deploy semantic views and agents to a target environment.
 
 Single source of config: reads config/environments.yaml (via evaluation/utils).
-There is NO config/deployment.yaml. The deploy target database / warehouse /
-role is read per-environment from environments.yaml; object SCHEMAS come from
-each object's own FQN (DATABASE.SCHEMA.NAME). 'dev' is the source of truth — the
-same objects are promoted to other environments by retargeting the database.
+Objects are stored as .yaml files in the repo:
+  - Semantic views: native YAML (from SYSTEM$READ_YAML_FROM_SEMANTIC_VIEW),
+    deployed via SYSTEM$CREATE_SEMANTIC_VIEW_FROM_YAML.
+  - Agents: pure spec YAML (from DESCRIBE AGENT → JSON → YAML),
+    wrapped in CREATE OR REPLACE AGENT at deploy time.
+
+'dev' is the source of truth — the same objects are promoted to other environments
+by retargeting the database (structured YAML field edit for SVs; FQN rewrite for agents).
 
 Usage:
     python setup/deploy.py --target semantic_view --environment prod
@@ -18,17 +22,15 @@ import os
 import subprocess
 import sys
 
+import yaml
+
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(PROJECT_ROOT, "evaluation"))
 from utils import load_config, get_semantic_views, get_agents  # noqa: E402
 
 
 def get_deploy_target(cfg: dict, environment: str) -> dict:
-    """Resolve the per-environment deploy target from environments.yaml.
-
-    Returns {"database", "warehouse", "role"}. Schema is NOT here — it comes
-    from each object's FQN. Warehouse falls back to the framework warehouse.
-    """
+    """Resolve the per-environment deploy target from environments.yaml."""
     envs = cfg.get("environments", {})
     if environment not in envs:
         sys.exit(f"ERROR: environment '{environment}' not found in config/environments.yaml")
@@ -52,7 +54,7 @@ def _parse_fqn(fqn: str):
 
 
 def run_sql(sql: str, role: str = None, use_temp_connection: bool = True) -> str:
-    """Execute SQL via snow CLI. Uses -x for temp connections (OIDC in CI)."""
+    """Execute SQL via snow CLI."""
     if role:
         sql = f"USE ROLE {role};\n{sql}"
     cmd = ["snow", "sql", "-q", sql]
@@ -65,88 +67,117 @@ def run_sql(sql: str, role: str = None, use_temp_connection: bool = True) -> str
     return result.stdout
 
 
-def generate_sv_ddl(yaml_path: str) -> str:
-    """Convert a semantic view YAML to DDL using generate_ddl.py."""
-    script = os.path.join(PROJECT_ROOT, "semantic_views", "generate_ddl.py")
-    result = subprocess.run(
-        [sys.executable, script, yaml_path],
-        capture_output=True, text=True
-    )
-    if result.returncode != 0:
-        print(f"DDL generation failed:\n{result.stderr}", file=sys.stderr)
-        sys.exit(1)
-    return result.stdout
+# ---------------------------------------------------------------------------
+# Semantic View: native YAML deploy
+# ---------------------------------------------------------------------------
 
+def retarget_sv_yaml(yaml_content: str, src_db: str, target_db: str) -> str:
+    """Retarget a semantic view YAML from src_db to target_db.
 
-def rewrite_fqn(ddl: str, original_db: str, schema: str, target_db: str) -> str:
-    """Retarget the DDL from the source database to the target (DB-only).
-
-    NOTE: this is still a naive string replace; an anchored, safe rewrite plus
-    file-based execution is deferred to a separate hardening change.
+    Performs a structured rewrite: parses the YAML, updates all
+    base_table.database fields, and re-serializes. This avoids the naive
+    global string-replace that could corrupt comments or descriptions.
     """
-    return ddl.replace(f"{original_db}.{schema}.", f"{target_db}.{schema}.")
+    sv = yaml.safe_load(yaml_content)
+    for table in sv.get("tables", []):
+        bt = table.get("base_table", {})
+        if bt.get("database", "").upper() == src_db.upper():
+            bt["database"] = target_db
+    return yaml.safe_dump(sv, sort_keys=False, default_flow_style=False, width=120)
 
 
 def deploy_semantic_views(cfg: dict, environment: str, target: dict,
                           use_temp: bool, dry_run: bool) -> list:
-    """Deploy semantic views (defined under dev) to the target environment.
-
-    Objects come from config (environments.dev). Schema is derived from each
-    FQN; the target database comes from the environment's deploy target.
-    """
-    svs = get_semantic_views("dev")  # dev is the single source of truth
+    """Deploy semantic views via SYSTEM$CREATE_SEMANTIC_VIEW_FROM_YAML."""
+    svs = get_semantic_views("dev")
     sv_dir = os.path.join(PROJECT_ROOT, "semantic_views")
     deployed = []
+
     for sv in svs:
         src_db, schema, name = _parse_fqn(sv["fqn"])
-        target_fqn = f"{target['database']}.{schema}.{name}"
-        if dry_run:
-            print(f"  would deploy: {target_fqn}  (from dev {sv['fqn']})")
-            deployed.append(target_fqn)
-            continue
-        # NOTE: still reads .yaml via generate_ddl — lossless .sql deploy is a
-        # separate follow-up issue.
+        target_schema_fqn = f"{target['database']}.{schema}"
+        target_fqn = f"{target_schema_fqn}.{name}"
+
         path = os.path.join(sv_dir, f"{sv['short_name'].lower()}.yaml")
         if not os.path.exists(path):
-            print(f"  SKIP (file not found): {path}", file=sys.stderr)
+            sys.exit(
+                f"ERROR: file not found for configured semantic view {sv['fqn']}.\n"
+                f"  Expected: {path}\n"
+                f"  Run the bootstrap capture step or create the file manually."
+            )
+
+        if dry_run:
+            print(f"  would deploy: {target_fqn}  (from {path})")
+            deployed.append(target_fqn)
             continue
-        ddl = generate_sv_ddl(path)
+
+        with open(path) as f:
+            yaml_content = f.read()
+
         if environment != "dev":
-            ddl = rewrite_fqn(ddl, src_db, schema, target["database"])
-        run_sql(ddl, role=target.get("role"), use_temp_connection=use_temp)
+            yaml_content = retarget_sv_yaml(yaml_content, src_db, target["database"])
+
+        escaped = yaml_content.replace("'", "''")
+        sql = f"CALL SYSTEM$CREATE_SEMANTIC_VIEW_FROM_YAML('{target_schema_fqn}', '{escaped}')"
+        run_sql(sql, role=target.get("role"), use_temp_connection=use_temp)
         deployed.append(target_fqn)
         print(f"  Deployed: {target_fqn}")
+
     return deployed
 
+
+# ---------------------------------------------------------------------------
+# Agent: YAML spec → CREATE OR REPLACE AGENT wrapper
+# ---------------------------------------------------------------------------
 
 def deploy_agents(cfg: dict, environment: str, target: dict,
                   use_temp: bool, dry_run: bool) -> list:
-    """Deploy agents (defined under dev) to the target environment."""
-    agents = get_agents("dev")  # dev is the single source of truth
+    """Deploy agents by wrapping .yaml spec in CREATE OR REPLACE AGENT."""
+    agents = get_agents("dev")
     agent_dir = os.path.join(PROJECT_ROOT, "agents")
     deployed = []
+
     for agent in agents:
         src_db, schema, name = _parse_fqn(agent["fqn"])
         target_fqn = f"{target['database']}.{schema}.{name}"
+
+        path = os.path.join(agent_dir, f"{agent['short_name'].lower()}.yaml")
+        if not os.path.exists(path):
+            sys.exit(
+                f"ERROR: file not found for configured agent {agent['fqn']}.\n"
+                f"  Expected: {path}\n"
+                f"  Run the bootstrap capture step or create the file manually."
+            )
+
         if dry_run:
-            print(f"  would deploy: {target_fqn}  (from dev {agent['fqn']})")
+            print(f"  would deploy: {target_fqn}  (from {path})")
             deployed.append(target_fqn)
             continue
-        path = os.path.join(agent_dir, f"{agent['short_name'].lower()}.sql")
-        if not os.path.exists(path):
-            print(f"  SKIP (file not found): {path}", file=sys.stderr)
-            continue
+
         with open(path) as f:
-            ddl = f.read()
-        lines = [ln for ln in ddl.split("\n") if not ln.strip().startswith("--")]
-        ddl = "\n".join(lines).strip().rstrip(";")
+            spec_yaml = f.read()
+
+        # Retarget SV references inside the agent spec for non-dev environments
         if environment != "dev":
-            ddl = rewrite_fqn(ddl, src_db, schema, target["database"])
+            spec_yaml = spec_yaml.replace(f"{src_db}.", f"{target['database']}.")
+
+        comment = agent.get("comment", "").replace("'", "''")
+        ddl = (
+            f"CREATE OR REPLACE AGENT {target_fqn}\n"
+            f"  COMMENT = '{comment}'\n"
+            f"  FROM SPECIFICATION\n"
+            f"  $$\n{spec_yaml}$$"
+        )
         run_sql(ddl, role=target.get("role"), use_temp_connection=use_temp)
         deployed.append(target_fqn)
         print(f"  Deployed: {target_fqn}")
+
     return deployed
 
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
 
 def main():
     parser = argparse.ArgumentParser(description="Deploy objects to a Snowflake environment.")
