@@ -3,37 +3,35 @@
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import TextField from "@mui/material/TextField"
 import MenuItem from "@mui/material/MenuItem"
+import { WINDOW_OPTIONS } from "@/lib/window"
 
-export function AgentFilter({ agents }: { agents: string[] }) {
+export function TimeWindow() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
-  const current = searchParams.get("agent") || ""
+  const current = searchParams.get("window") || "30d"
 
   function onChange(value: string) {
     const params = new URLSearchParams(searchParams.toString())
-    if (value) {
-      params.set("agent", value)
+    if (value && value !== "30d") {
+      params.set("window", value)
     } else {
-      params.delete("agent")
+      params.delete("window")
     }
     router.push(`${pathname}?${params.toString()}`)
   }
-
-  if (agents.length === 0) return null
 
   return (
     <TextField
       select
       size="small"
-      label="Agent"
+      label="Window"
       value={current}
       onChange={(e) => onChange(e.target.value)}
-      sx={{ minWidth: 200 }}
+      sx={{ minWidth: 140 }}
     >
-      <MenuItem value="">All agents</MenuItem>
-      {agents.map((a) => (
-        <MenuItem key={a} value={a}>{a}</MenuItem>
+      {WINDOW_OPTIONS.map((w) => (
+        <MenuItem key={w.key} value={w.key}>{w.label}</MenuItem>
       ))}
     </TextField>
   )

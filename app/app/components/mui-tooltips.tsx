@@ -1,116 +1,112 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import * as React from "react";
+import Tooltip from "@mui/material/Tooltip";
+import IconButton from "@mui/material/IconButton";
+import Popover from "@mui/material/Popover";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
+import Link from "@mui/material/Link";
+import { InfoIcon } from "@phosphor-icons/react/dist/ssr/Info";
+import { QuestionIcon } from "@phosphor-icons/react/dist/ssr/Question";
 
-interface TooltipProps {
-  label: string
-  children: React.ReactNode
-}
-
-export function Tooltip({ label, children }: TooltipProps) {
-  const [open, setOpen] = useState(false)
-
+/** Small hover tooltip for column headers / short explanatory text. */
+export function InfoTip({ text }: { text: string }) {
   return (
-    <span className="tooltip-wrapper">
-      <button
-        className="tooltip-trigger"
-        onClick={() => setOpen(!open)}
-        aria-label={`Help: ${label}`}
-      >?</button>
-      {open && (
-        <div className="tooltip-content">
-          <div className="tooltip-header">
-            <strong>{label}</strong>
-            <button className="tooltip-close" onClick={() => setOpen(false)}>×</button>
-          </div>
-          <div className="tooltip-body">{children}</div>
-        </div>
-      )}
-    </span>
-  )
-}
-
-// --- Predefined resolution tooltips ---
-
-export function AlertTooltip({ alertType }: { alertType: string }) {
-  const guidance = ALERT_GUIDANCE[alertType] || ALERT_GUIDANCE.default
-  return (
-    <Tooltip label={guidance.title}>
-      <p>{guidance.description}</p>
-      <h4>How to resolve:</h4>
-      <ol>
-        {guidance.steps.map((s, i) => <li key={i}>{s}</li>)}
-      </ol>
-      {guidance.docLink && (
-        <p className="tooltip-link">
-          <a href={guidance.docLink} target="_blank" rel="noopener noreferrer">Snowflake Docs →</a>
-        </p>
-      )}
-      {guidance.cocoCommand && (
-        <p className="tooltip-coco">
-          <strong>Cortex Code:</strong> <code>{guidance.cocoCommand}</code>
-        </p>
-      )}
+    <Tooltip title={text} arrow placement="top">
+      <Box component="span" sx={{ display: "inline-flex", verticalAlign: "middle", ml: 0.5, color: "text.disabled", cursor: "help" }}>
+        <InfoIcon fontSize="var(--icon-fontSize-sm)" />
+      </Box>
     </Tooltip>
-  )
+  );
 }
 
-export function QualityFlagTooltip({ flag }: { flag: string }) {
-  const guidance = QUALITY_FLAG_GUIDANCE[flag] || QUALITY_FLAG_GUIDANCE.default
+interface Guidance {
+  title: string;
+  description: string;
+  steps: string[];
+  docLink?: string;
+  cocoCommand?: string;
+}
+
+function GuidancePopover({ guidance }: { guidance: Guidance }) {
+  const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
+  const open = Boolean(anchorEl);
   return (
-    <Tooltip label={guidance.title}>
-      <p>{guidance.description}</p>
-      <h4>How to fix:</h4>
-      <ol>
-        {guidance.steps.map((s, i) => <li key={i}>{s}</li>)}
-      </ol>
-      {guidance.docLink && (
-        <p className="tooltip-link">
-          <a href={guidance.docLink} target="_blank" rel="noopener noreferrer">Snowflake Docs →</a>
-        </p>
-      )}
-    </Tooltip>
-  )
+    <>
+      <IconButton size="small" onClick={(e) => setAnchorEl(e.currentTarget)} aria-label={`Help: ${guidance.title}`}>
+        <QuestionIcon fontSize="var(--icon-fontSize-sm)" />
+      </IconButton>
+      <Popover
+        open={open}
+        anchorEl={anchorEl}
+        onClose={() => setAnchorEl(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
+        slotProps={{ paper: { sx: { p: 2, maxWidth: 380 } } }}
+      >
+        <Typography variant="subtitle1" gutterBottom>
+          {guidance.title}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          {guidance.description}
+        </Typography>
+        <Typography variant="subtitle2" sx={{ mt: 1 }}>
+          How to resolve:
+        </Typography>
+        <Box component="ol" sx={{ pl: 2.5, m: 0, "& li": { mb: 0.5 } }}>
+          {guidance.steps.map((s, i) => (
+            <Typography key={i} component="li" variant="body2" color="text.secondary">
+              {s}
+            </Typography>
+          ))}
+        </Box>
+        {guidance.docLink ? (
+          <Typography variant="body2" sx={{ mt: 1 }}>
+            <Link href={guidance.docLink} target="_blank" rel="noopener noreferrer">
+              Snowflake Docs &rarr;
+            </Link>
+          </Typography>
+        ) : null}
+        {guidance.cocoCommand ? (
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
+            <strong>Cortex Code:</strong> <code>{guidance.cocoCommand}</code>
+          </Typography>
+        ) : null}
+      </Popover>
+    </>
+  );
 }
 
-export function AccuracyTooltip({ passed, delta }: { passed: boolean; delta: number | null }) {
-  if (passed && (delta === null || delta >= 0)) return null
-
-  const isRegression = delta !== null && delta < 0
-  const guidance = isRegression ? ACCURACY_GUIDANCE.regression : ACCURACY_GUIDANCE.failed
-
-  return (
-    <Tooltip label={guidance.title}>
-      <p>{guidance.description}</p>
-      <h4>Recommended actions:</h4>
-      <ol>
-        {guidance.steps.map((s, i) => <li key={i}>{s}</li>)}
-      </ol>
-      {guidance.docLink && (
-        <p className="tooltip-link">
-          <a href={guidance.docLink} target="_blank" rel="noopener noreferrer">Snowflake Docs →</a>
-        </p>
-      )}
-      {guidance.cocoCommand && (
-        <p className="tooltip-coco">
-          <strong>Cortex Code:</strong> <code>{guidance.cocoCommand}</code>
-        </p>
-      )}
-    </Tooltip>
-  )
+export function AlertGuidance({ alertType }: { alertType: string }) {
+  const g = ALERT_GUIDANCE[alertType] || ALERT_GUIDANCE.default;
+  return <GuidancePopover guidance={g} />;
 }
 
-// --- Guidance data ---
+export function QualityFlagGuidance({ flag }: { flag: string }) {
+  const g = QUALITY_FLAG_GUIDANCE[flag] || QUALITY_FLAG_GUIDANCE.default;
+  return <GuidancePopover guidance={g} />;
+}
 
-const ALERT_GUIDANCE: Record<string, { title: string; description: string; steps: string[]; docLink?: string; cocoCommand?: string }> = {
+export function AccuracyGuidance({ passed, delta }: { passed: boolean; delta: number | null }) {
+  // Only surface guidance when there is a problem (failing or regressing).
+  if (passed && (delta === null || delta >= 0)) return null;
+  const isRegression = delta !== null && delta < 0;
+  const g = isRegression ? ACCURACY_GUIDANCE.regression : ACCURACY_GUIDANCE.failed;
+  return <GuidancePopover guidance={g} />;
+}
+
+// --- Guidance data (ported from v2.1 tooltips) ---
+
+const ALERT_GUIDANCE: Record<string, Guidance> = {
   negative_feedback_spike: {
     title: "Negative Feedback Spike",
     description: "More than 25% of user feedback was negative. This usually indicates the agent is generating incorrect or unhelpful answers for common queries.",
     steps: [
       "Review the negative feedback in the USER_FEEDBACK table to identify patterns.",
-      "Add the problematic queries as 'hard' questions to your question bank: question_banks/semantic_view/hard_questions.yaml",
+      "Add the problematic queries as 'hard' questions to your question bank.",
       "Check if the semantic view descriptions need improvement for those query patterns.",
-      "Run an evaluation to measure current accuracy: python evaluation/evaluate_semantic_view.py --environment dev",
+      "Run an evaluation to measure current accuracy.",
       "If the semantic view has gaps, add verified queries (VQRs) to cover the failing patterns.",
     ],
     docLink: "https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-analyst/verified-queries",
@@ -123,7 +119,7 @@ const ALERT_GUIDANCE: Record<string, { title: string; description: string; steps
       "Check git history for recent changes to the semantic view YAML.",
       "Review the SEMANTIC_VIEW_EVAL_DETAILS table to find which questions now fail.",
       "Add the failing questions to your question bank so CI catches this in future.",
-      "Run the audit to check for structural issues: python evaluation/audit_semantic_view.py --environment dev",
+      "Run the audit to check for structural issues.",
       "Consider reverting the change and re-testing with a broader question bank.",
     ],
     docLink: "https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-analyst/semantic-view-best-practices",
@@ -142,7 +138,7 @@ const ALERT_GUIDANCE: Record<string, { title: string; description: string; steps
   },
   cost_anomaly: {
     title: "Cost Anomaly",
-    description: "Daily AI credit consumption was more than 2x the 7-day average. This could be a traffic spike or an agent stuck in a loop burning tokens.",
+    description: "Daily AI credit consumption was well above the recent average. This could be a traffic spike or an agent stuck in a loop burning tokens.",
     steps: [
       "Check V_AGENT_USAGE_PATTERNS for unusual request counts.",
       "Look for agents with high token burn in the Quality tab (flag_high_token_burn).",
@@ -158,19 +154,9 @@ const ALERT_GUIDANCE: Record<string, { title: string; description: string; steps
       "Query AGENT_TRACES where status_code != 'STATUS_CODE_OK' to see error details.",
       "Check if a semantic view was dropped/recreated (causes agent binding failures).",
       "Verify warehouse is running and accessible to the agent's execution role.",
-      "Run a health check: python evaluation/health_check.py --environment dev",
+      "Run a health check.",
     ],
     docLink: "https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-agent#troubleshooting",
-  },
-  health_failure: {
-    title: "Health Check Failed",
-    description: "One or more health checks returned UNHEALTHY. The agent or semantic view may be inaccessible.",
-    steps: [
-      "Check if the semantic view/agent still exists: DESCRIBE SEMANTIC VIEW / DESCRIBE AGENT.",
-      "Verify grants are in place for the running role.",
-      "Check warehouse status — an auto-suspended warehouse may need resuming.",
-      "Re-run health check for details: python evaluation/health_check.py --environment dev",
-    ],
   },
   interaction_quality: {
     title: "Interaction Quality Issues",
@@ -188,15 +174,11 @@ const ALERT_GUIDANCE: Record<string, { title: string; description: string; steps
   default: {
     title: "Alert",
     description: "A monitoring threshold was breached.",
-    steps: [
-      "Check the alert message for specific details.",
-      "Review the relevant monitoring view for trends.",
-      "Run a health check: python evaluation/health_check.py --environment dev",
-    ],
+    steps: ["Check the alert message for specific details.", "Review the relevant monitoring view for trends.", "Run a health check."],
   },
-}
+};
 
-const QUALITY_FLAG_GUIDANCE: Record<string, { title: string; description: string; steps: string[]; docLink?: string }> = {
+const QUALITY_FLAG_GUIDANCE: Record<string, Guidance> = {
   flag_tool_looping: {
     title: "Tool Call Looping",
     description: "The agent called the same tool 3+ times in a single request. This usually means the semantic view returned ambiguous or incorrect SQL, and the agent retried.",
@@ -213,7 +195,7 @@ const QUALITY_FLAG_GUIDANCE: Record<string, { title: string; description: string
     description: "The agent used 4+ planning steps. This means the orchestration model struggled to find the right approach.",
     steps: [
       "Review the agent's tool configuration — fewer tools means fewer decisions.",
-      "Check if the query requires multi-step SQL (JOINs, subqueries) that could be simplified with a view.",
+      "Check if the query requires multi-step SQL that could be simplified with a view.",
       "Add a VQR so the analyst tool returns correct SQL on the first attempt.",
     ],
     docLink: "https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-agent#best-practices",
@@ -252,14 +234,11 @@ const QUALITY_FLAG_GUIDANCE: Record<string, { title: string; description: string
   default: {
     title: "Quality Flag",
     description: "An interaction quality issue was detected.",
-    steps: [
-      "Review the flagged interaction details.",
-      "Check the user query and agent response pattern.",
-    ],
+    steps: ["Review the flagged interaction details.", "Check the user query and agent response pattern."],
   },
-}
+};
 
-const ACCURACY_GUIDANCE = {
+const ACCURACY_GUIDANCE: Record<string, Guidance> = {
   regression: {
     title: "Accuracy Regression",
     description: "Accuracy dropped compared to the previous evaluation run. A recent change may have broken existing query patterns.",
@@ -268,7 +247,7 @@ const ACCURACY_GUIDANCE = {
       "Compare the generated SQL vs expected SQL to identify what changed.",
       "Review recent semantic view changes in git history.",
       "Add the failing queries as verified queries (VQRs) to ensure correct SQL generation.",
-      "Re-run evaluation after fixing: python evaluation/evaluate_semantic_view.py --environment dev",
+      "Re-run evaluation after fixing.",
     ],
     docLink: "https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-analyst/verified-queries",
     cocoCommand: "/semantic-view (to add VQRs for failing queries)",
@@ -280,11 +259,11 @@ const ACCURACY_GUIDANCE = {
       "Review which question categories are failing (easy/hard/ambiguous).",
       "For 'easy' failures: check that basic dimension and metric descriptions are clear.",
       "For 'hard' failures: add verified queries (VQRs) that provide the exact SQL template.",
-      "Add user feedback queries to your question bank: question_banks/semantic_view/hard_questions.yaml",
+      "Add user feedback queries to your question bank.",
       "Improve table/column descriptions in the semantic view to be more specific.",
-      "Run the audit for structural issues: python evaluation/audit_semantic_view.py --environment dev",
+      "Run the audit for structural issues.",
     ],
     docLink: "https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-analyst/semantic-view-best-practices",
     cocoCommand: "/semantic-view (to improve descriptions and add VQRs)",
   },
-}
+};
