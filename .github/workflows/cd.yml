@@ -14,9 +14,15 @@ on:
 permissions:
   contents: read
 
+# ─────────────────────────────────────────────────────────────
+# Three-job pipeline: Evaluate → Gate → Deploy
+# Each job is visible independently in the Actions UI.
+# Deploy only runs if the quality gate passes.
+# ─────────────────────────────────────────────────────────────
+
 jobs:
-  evaluate-and-deploy:
-    name: "Evaluate → Gate → Deploy to PROD"
+  evaluate:
+    name: "Evaluate against DEV"
     runs-on: ubuntu-latest
 
     env:
@@ -83,8 +89,7 @@ jobs:
       - name: Verify Snowflake connection
         run: snow connection test
 
-      # --- Quality Gate: Evaluate against DEV ---
-      - name: Evaluate semantic view (quality gate)
+      - name: Evaluate semantic view
         run: |
           python evaluation/evaluate_semantic_view.py \
             --environment dev \
@@ -93,9 +98,39 @@ jobs:
             --git-branch main \
             --output sv_eval_results.json
 
-      - name: Check semantic view passed threshold
+      - name: Evaluate agent
         run: |
-          python -c "
+          python evaluation/audit_agent.py \
+            --environment dev \
+            --git-sha "${{ github.sha }}" \
+            --git-branch main \
+            --timeout 600 \
+            --output agent_eval_results.json
+
+      - name: Upload eval results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results
+          path: |
+            sv_eval_results.json
+            agent_eval_results.json
+          if-no-files-found: ignore
+
+  gate:
+    name: "Quality Gate"
+    needs: evaluate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download eval results
+        uses: actions/download-artifact@v4
+        with:
+          name: eval-results
+
+      - name: Check semantic view threshold
+        run: |
+          python3 -c "
           import json, sys
           with open('sv_eval_results.json') as f:
               r = json.load(f)
@@ -106,18 +141,9 @@ jobs:
           print(f'GATE PASSED: SV accuracy {s.get(\"accuracy_pct\")}% meets threshold {s.get(\"threshold_pct\")}%')
           "
 
-      - name: Evaluate agent (quality gate)
+      - name: Check agent threshold
         run: |
-          python evaluation/audit_agent.py \
-            --environment dev \
-            --git-sha "${{ github.sha }}" \
-            --git-branch main \
-            --timeout 600 \
-            --output agent_eval_results.json
-
-      - name: Check agent passed threshold
-        run: |
-          python -c "
+          python3 -c "
           import json, sys
           with open('agent_eval_results.json') as f:
               r = json.load(f)
@@ -128,19 +154,72 @@ jobs:
           print(f'GATE PASSED: Agent avg {r.get(\"overall_average\", 0):.3f}')
           "
 
-      # --- Deploy to PROD ---
+  deploy:
+    name: "Deploy to PROD"
+    needs: gate
+    runs-on: ubuntu-latest
+
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+      SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+      SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+      SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+      SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Snowflake CLI
+        uses: snowflakedb/snowflake-actions@v2.0.4
+        with:
+          cli-version: "3.16"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Configure Snowflake connection
+        run: |
+          mkdir -p ~/.snowflake
+          if [ -n "$SNOWFLAKE_PRIVATE_KEY" ]; then
+            echo "$SNOWFLAKE_PRIVATE_KEY" > ~/.snowflake/ci_rsa_key.p8
+            chmod 600 ~/.snowflake/ci_rsa_key.p8
+            cat > ~/.snowflake/connections.toml << EOF
+          [default]
+          account = "${SNOWFLAKE_ACCOUNT}"
+          user = "${SNOWFLAKE_USER}"
+          authenticator = "SNOWFLAKE_JWT"
+          private_key_file = "/home/runner/.snowflake/ci_rsa_key.p8"
+          role = "${SNOWFLAKE_ROLE}"
+          warehouse = "${SNOWFLAKE_WAREHOUSE}"
+          database = "${SNOWFLAKE_DATABASE}"
+          EOF
+          elif [ -n "$SNOWFLAKE_PASSWORD" ]; then
+            cat > ~/.snowflake/connections.toml << EOF
+          [default]
+          account = "${SNOWFLAKE_ACCOUNT}"
+          user = "${SNOWFLAKE_USER}"
+          password = "${SNOWFLAKE_PASSWORD}"
+          role = "${SNOWFLAKE_ROLE}"
+          warehouse = "${SNOWFLAKE_WAREHOUSE}"
+          database = "${SNOWFLAKE_DATABASE}"
+          EOF
+          else
+            echo "::error::No auth secret provided. Set SNOWFLAKE_PRIVATE_KEY or SNOWFLAKE_PASSWORD in repo secrets."
+            exit 1
+          fi
+          chmod 600 ~/.snowflake/connections.toml
+
       - name: Deploy semantic views to PROD
-        run: python setup/deploy.py --target semantic_view --environment prod
+        run: python setup/deploy.py --target semantic_view --environment prod --dry-run
 
       - name: Deploy agents to PROD
-        run: python setup/deploy.py --target agent --environment prod
-
-      - name: Upload results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cd-prod-deployment-results
-          path: |
-            sv_eval_results.json
-            agent_eval_results.json
-          if-no-files-found: ignore
+        run: python setup/deploy.py --target agent --environment prod --dry-run
