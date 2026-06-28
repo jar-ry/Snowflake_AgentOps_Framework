@@ -49,6 +49,17 @@ function severityColor(sev: string): "error" | "warning" | "info" | "success" | 
   return "default";
 }
 
+// Lower number = more severe. Mirrors severityColor's tiers so sort order
+// matches the chip colors. Unknown values sort last.
+function severityRank(sev: string): number {
+  const s = (sev || "").toUpperCase();
+  if (s === "CRITICAL" || s === "FAIL" || s === "NEGATIVE") return 0;
+  if (s === "WARNING" || s === "NEUTRAL") return 1;
+  if (s === "INFO") return 2;
+  if (s === "PASS" || s === "HEALTHY" || s === "OK" || s === "POSITIVE") return 3;
+  return 99;
+}
+
 export function DataTableCard({
   title,
   subheader,
@@ -64,6 +75,8 @@ export function DataTableCard({
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(pageSize ?? 10);
 
+  const sortColType = orderBy ? columns.find((c) => c.key === orderBy)?.type : undefined;
+
   const sorted = React.useMemo(() => {
     if (!orderBy) return rows;
     const copy = [...rows];
@@ -73,12 +86,13 @@ export function DataTableCard({
       if (av == null) return 1;
       if (bv == null) return -1;
       let cmp: number;
-      if (typeof av === "number" && typeof bv === "number") cmp = av - bv;
+      if (sortColType === "severity") cmp = severityRank(String(av)) - severityRank(String(bv));
+      else if (typeof av === "number" && typeof bv === "number") cmp = av - bv;
       else cmp = String(av).localeCompare(String(bv));
       return order === "asc" ? cmp : -cmp;
     });
     return copy;
-  }, [rows, orderBy, order]);
+  }, [rows, orderBy, order, sortColType]);
 
   const paginated = pageSize ? sorted.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage) : sorted;
 
