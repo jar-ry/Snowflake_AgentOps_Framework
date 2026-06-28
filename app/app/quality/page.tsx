@@ -2,6 +2,7 @@ import Grid from "@mui/material/Grid"
 import Box from "@mui/material/Box"
 
 import { querySnowflake } from "@/lib/snowflake"
+import { friendlyError } from "@/lib/errors"
 import { pivotByDate, toDateStr } from "@/lib/chart-data"
 import { parseWindow } from "@/lib/window"
 import { pickEnv } from "@/lib/env"
@@ -117,7 +118,7 @@ export default async function QualityPage({ searchParams }: Props) {
       ORDER BY metric_date ASC
     `)
   } catch (e) {
-    error = e instanceof Error ? e.message : "Unknown error"
+    error = friendlyError("quality", e)
   }
 
   const { data: flaggedData, seriesNames } = pivotByDate(flaggedTrend, "SUMMARY_DATE", "AGENT_NAME", "FLAGGED_REQUEST_PCT")

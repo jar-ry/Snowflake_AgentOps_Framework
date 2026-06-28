@@ -2,6 +2,7 @@ import Grid from "@mui/material/Grid"
 import Box from "@mui/material/Box"
 
 import { querySnowflake } from "@/lib/snowflake"
+import { friendlyError } from "@/lib/errors"
 import { parseWindow } from "@/lib/window"
 import { pickEnv } from "@/lib/env"
 import { getEnvironments } from "@/lib/environments"
@@ -94,7 +95,7 @@ export default async function Overview({ searchParams }: Props) {
       LIMIT 5
     `)
   } catch (e) {
-    error = e instanceof Error ? e.message : "Unknown error"
+    error = friendlyError("overview", e)
   }
 
   const requestsSeries = series.map((r) => Number(r.REQUESTS))
