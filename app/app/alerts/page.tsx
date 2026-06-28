@@ -2,6 +2,7 @@ import Grid from "@mui/material/Grid"
 import Box from "@mui/material/Box"
 
 import { querySnowflake } from "@/lib/snowflake"
+import { friendlyError } from "@/lib/errors"
 import { toDateStr } from "@/lib/chart-data"
 import { parseWindow } from "@/lib/window"
 import { pickEnv } from "@/lib/env"
@@ -74,7 +75,7 @@ export default async function AlertsPage({ searchParams }: Props) {
       ORDER BY alert_date ASC
     `)
   } catch (e) {
-    error = e instanceof Error ? e.message : "Unknown error"
+    error = friendlyError("alerts", e)
   }
 
   const historyData = history.map((r) => ({ DATE: toDateStr(r.ALERT_DATE), COUNT: Number(r.ALERT_COUNT) }))
