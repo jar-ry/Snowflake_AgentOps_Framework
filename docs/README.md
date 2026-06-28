@@ -45,6 +45,7 @@ flowchart LR
 Task-oriented, step-by-step guides.
 
 - [Run evaluations locally](how-to/run-evaluations-locally.md) — CLI commands for audits, evaluations, question-bank generation, and health checks against a configured environment.
+- [Sync edits from Snowsight into git](how-to/sync-edits-from-snowsight.md) — pull semantic view / agent changes made in the Snowsight UI back into the repo as reviewable `.yaml`, closing the Snowsight → git loop.
 - [Set up CI/CD](how-to/set-up-ci-cd.md) — pipeline stages, environment variables, and how to wire them into GitHub Actions, GitLab CI, Azure DevOps, or any other CI system.
 
 ## Reference

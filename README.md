@@ -126,6 +126,18 @@ You can run audits, evaluations, question-bank generation, and health checks fro
 
 ---
 
+## Sync edits from Snowsight into git
+
+When you edit a semantic view or agent in the Snowsight UI, pull that change back into the repo so it can be reviewed and deployed:
+
+```bash
+python evaluation/sync_from_snowflake.py --environment dev
+```
+
+This is the inverse of `setup/deploy.py` — it captures the live definition into a reviewable `.yaml`, closing the `Snowsight → Git` step shown in the architecture diagram. See [How-to: Sync edits from Snowsight into git](docs/how-to/sync-edits-from-snowsight.md).
+
+---
+
 ## Monitoring & observability
 
 The framework creates tables, views, alerts, and tasks in your chosen schema (see `setup/00_framework_tables.sql`). Three daily tasks aggregate usage, feedback, and interaction-quality data, and seven Snowflake Alerts fire on regressions — feedback spikes, accuracy drops, latency degradation, cost anomalies, error spikes, health failures, and interaction-quality issues. See [Pillar 3: Runtime monitoring](docs/explanation/pillar-3-runtime-monitoring.md) for the full task schedule, alert thresholds, and severity logic.
@@ -165,6 +177,7 @@ Quality gates are configured per environment in `config/thresholds.yaml` — per
 |----------|------|----------------|
 | [Set up CI/CD](docs/how-to/set-up-ci-cd.md) | How-to | Pipeline stages, env vars, wiring into any CI |
 | [Run evaluations locally](docs/how-to/run-evaluations-locally.md) | How-to | CLI commands for audits, evals, and health checks |
+| [Sync edits from Snowsight into git](docs/how-to/sync-edits-from-snowsight.md) | How-to | Pull UI edits back into the repo as reviewable `.yaml` |
 | [docs/README.md](docs/README.md) | Index | Documentation map |
 | [Cost model](docs/reference/cost-model.md) | Reference | Evaluation cost in AI Credits |
 | [Pillar 1: Input governance](docs/explanation/pillar-1-input-governance.md) | Explanation | Semantic view audit design |
