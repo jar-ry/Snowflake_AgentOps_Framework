@@ -218,6 +218,12 @@ jobs:
           fi
           chmod 600 ~/.snowflake/connections.toml
 
+      - name: Drift check (warn only) — live PROD vs committed
+        run: |
+          if ! python evaluation/sync_from_snowflake.py --environment prod --check; then
+            echo "::warning::Live PROD objects differ from committed .yaml. The deploy below will overwrite live PROD with the committed version — confirm this is intended."
+          fi
+
       - name: Deploy semantic views to PROD
         run: python setup/deploy.py --target semantic_view --environment prod --dry-run
 

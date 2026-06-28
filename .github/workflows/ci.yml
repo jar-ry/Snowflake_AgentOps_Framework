@@ -91,6 +91,13 @@ jobs:
       - name: Verify Snowflake connection
         run: snow connection test
 
+      - name: Drift guard — fail if live DEV objects differ from committed .yaml
+        run: |
+          python evaluation/sync_from_snowflake.py --environment dev --check || {
+            echo "::error::Live DEV objects have drifted from committed .yaml. Run 'python evaluation/sync_from_snowflake.py --environment dev' and commit the result."
+            exit 1
+          }
+
       - name: Run semantic view evaluation
         run: |
           BRANCH="${{ github.head_ref || github.ref_name }}"

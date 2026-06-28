@@ -17,6 +17,14 @@ Usage:
     python evaluation/sync_from_snowflake.py --environment dev
     python evaluation/sync_from_snowflake.py --environment dev --dry-run
     python evaluation/sync_from_snowflake.py --environment dev --target agent
+    python evaluation/sync_from_snowflake.py --environment dev --check   # CI drift guard
+
+--check is the CI drift guard (issue #22): it compares each live object against
+its committed .yaml WITHOUT writing, and exits 1 if any object has drifted (was
+edited in Snowsight but never captured). Because the comparison reuses the exact
+serialization that capture would write, an unchanged object always matches — no
+false positives. With no objects configured it is a no-op (exit 0), so it is safe
+in the framework template and fresh installs.
 """
 import argparse
 import json
@@ -70,11 +78,32 @@ def _write_if_changed(path: str, content: str, dry_run: bool) -> str:
     return "WROTE"
 
 
-def capture_semantic_views(conn, environment: str, dry_run: bool) -> int:
-    """Capture each governed SV via SYSTEM$READ_YAML_FROM_SEMANTIC_VIEW."""
+def _compare(path: str, content: str) -> str:
+    """Compare freshly-exported content to the committed file (no writes).
+    Returns 'UNCHANGED', 'DRIFTED', or 'MISSING' (no committed file yet)."""
+    if not os.path.exists(path):
+        return "MISSING"
+    with open(path) as f:
+        existing = f.read()
+    return "UNCHANGED" if existing == content else "DRIFTED"
+
+
+def _safe_list(fn, environment: str) -> list:
+    """Call get_semantic_views/get_agents, returning [] if config is absent/invalid.
+    Lets --check no-op gracefully (exit 0) in the template / fresh installs."""
+    try:
+        return fn(environment) or []
+    except Exception:
+        return []
+
+
+def capture_semantic_views(conn, environment: str, dry_run: bool, check: bool = False):
+    """Capture (or, when check=True, compare) each governed SV via
+    SYSTEM$READ_YAML_FROM_SEMANTIC_VIEW. Returns (errors, drift)."""
     svs = get_semantic_views(environment)
     sv_dir = os.path.join(PROJECT_ROOT, "semantic_views")
     errors = 0
+    drift = 0
     print("Semantic views:")
     if not svs:
         print("  (none configured)")
@@ -90,16 +119,23 @@ def capture_semantic_views(conn, environment: str, dry_run: bool) -> int:
         if not content.endswith("\n"):
             content += "\n"
         path = os.path.join(sv_dir, f"{_short_name(sv)}.yaml")
-        status = _write_if_changed(path, content, dry_run)
+        if check:
+            status = _compare(path, content)
+            if status != "UNCHANGED":
+                drift += 1
+        else:
+            status = _write_if_changed(path, content, dry_run)
         print(f"  {status}: {os.path.relpath(path, PROJECT_ROOT)}  (from {fqn})")
-    return errors
+    return errors, drift
 
 
-def capture_agents(conn, environment: str, dry_run: bool) -> int:
-    """Capture each governed agent via DESCRIBE AGENT -> JSON -> YAML (pure spec)."""
+def capture_agents(conn, environment: str, dry_run: bool, check: bool = False):
+    """Capture (or, when check=True, compare) each governed agent via
+    DESCRIBE AGENT -> JSON -> YAML (pure spec). Returns (errors, drift)."""
     agents = get_agents(environment)
     agent_dir = os.path.join(PROJECT_ROOT, "agents")
     errors = 0
+    drift = 0
     print("Agents:")
     if not agents:
         print("  (none configured)")
@@ -125,9 +161,14 @@ def capture_agents(conn, environment: str, dry_run: bool) -> int:
         # Pure spec YAML — no CREATE wrapper. sort_keys=False keeps stable, diff-friendly order.
         content = yaml.safe_dump(spec, sort_keys=False, default_flow_style=False, width=100)
         path = os.path.join(agent_dir, f"{_short_name(agent)}.yaml")
-        status = _write_if_changed(path, content, dry_run)
+        if check:
+            status = _compare(path, content)
+            if status != "UNCHANGED":
+                drift += 1
+        else:
+            status = _write_if_changed(path, content, dry_run)
         print(f"  {status}: {os.path.relpath(path, PROJECT_ROOT)}  (from {fqn})")
-    return errors
+    return errors, drift
 
 
 def main():
@@ -140,22 +181,57 @@ def main():
                         help="Which object type(s) to capture.")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what would change without writing files.")
+    parser.add_argument("--check", action="store_true",
+                        help="CI drift guard: compare live objects to committed .yaml without "
+                             "writing; exit 1 if any object has drifted. No-op (exit 0) when no "
+                             "objects are configured.")
     args = parser.parse_args()
+
+    # Drift guard no-op: if nothing is configured (or config is absent/invalid),
+    # there is nothing to check — exit cleanly WITHOUT opening a connection. This
+    # keeps the guard safe in the framework template and fresh installs.
+    if args.check:
+        want_sv = args.target in ("semantic_view", "all")
+        want_agent = args.target in ("agent", "all")
+        n_sv = len(_safe_list(get_semantic_views, args.environment)) if want_sv else 0
+        n_agent = len(_safe_list(get_agents, args.environment)) if want_agent else 0
+        if n_sv + n_agent == 0:
+            print("No objects configured; skipping drift check.")
+            sys.exit(0)
 
     conn = get_connection(args.environment)
 
+    if args.check:
+        banner = f"Drift check (live vs committed) — {args.environment.upper()}"
+    else:
+        banner = f"{'DRY RUN — ' if args.dry_run else ''}Capturing from {args.environment.upper()}"
     print(f"\n{'='*60}")
-    print(f"  {'DRY RUN — ' if args.dry_run else ''}Capturing from {args.environment.upper()}")
+    print(f"  {banner}")
     print(f"{'='*60}\n")
 
     errors = 0
+    drift = 0
     try:
         if args.target in ("semantic_view", "all"):
-            errors += capture_semantic_views(conn, args.environment, args.dry_run)
+            e, d = capture_semantic_views(conn, args.environment, args.dry_run, args.check)
+            errors += e
+            drift += d
         if args.target in ("agent", "all"):
-            errors += capture_agents(conn, args.environment, args.dry_run)
+            e, d = capture_agents(conn, args.environment, args.dry_run, args.check)
+            errors += e
+            drift += d
     finally:
         conn.close()
+
+    if args.check:
+        if drift or errors:
+            print(f"\nDrift check FAILED for {args.environment.upper()}: "
+                  f"{drift} object(s) drifted, {errors} error(s).", file=sys.stderr)
+            print("Run 'python evaluation/sync_from_snowflake.py "
+                  f"--environment {args.environment}' and commit the result.", file=sys.stderr)
+            sys.exit(1)
+        print(f"\nDrift check passed for {args.environment.upper()}: all objects in sync.")
+        return
 
     verb = "Dry run" if args.dry_run else "Capture"
     print(f"\n{verb} for {args.environment.upper()} complete.")

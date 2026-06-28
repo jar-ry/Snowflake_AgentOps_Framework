@@ -50,6 +50,7 @@ Edit in Snowsight  →  sync_from_snowflake.py  →  git diff  →  commit  → 
 | `--environment dev` | Which environment block in `config/environments.yaml` to capture from. Use `dev` for normal authoring. |
 | `--target semantic_view \| agent \| all` | Limit the capture to one object type. Defaults to `all`. |
 | `--dry-run` | Show what *would* change (`WROTE` / `UNCHANGED` / `WOULD CHANGE`) without writing files. |
+| `--check` | **CI drift guard.** Compare live objects to the committed `.yaml` without writing; exit non-zero if any object has drifted. No-op (exit 0) when no objects are configured. See below. |
 
 ## How it captures each object type
 
@@ -61,6 +62,35 @@ Edit in Snowsight  →  sync_from_snowflake.py  →  git diff  →  commit  → 
 - **Read-only.** The script only runs `SELECT` / `DESCRIBE` against Snowflake. It never modifies your account — the only thing it changes is local files.
 - **Deterministic.** Re-running with no Snowsight change produces no git diff, so a diff always reflects a real edit.
 - **Fails loudly.** If a configured object is missing or inaccessible, the script prints a clear error and exits non-zero rather than writing an empty file.
+
+## CI drift guard (`--check`)
+
+The capture step only helps if people actually run it. The drift guard enforces that: it catches the case where someone edits an object in Snowsight but never captures the change into git, so the committed `.yaml` silently goes stale (and the next deploy would overwrite their edit).
+
+```bash
+python evaluation/sync_from_snowflake.py --environment dev --check
+```
+
+`--check` re-exports each live object and compares it to the committed file **without writing anything**. Because it reuses the exact serialization that capture would write, an unchanged object always matches — there are no false positives from formatting or key order. It reports `UNCHANGED`, `DRIFTED`, or `MISSING` (no committed file yet) per object, and:
+
+- **exits `0`** when everything is in sync (or nothing is configured), or
+- **exits `1`** when any object has drifted, naming the object and the command to fix it.
+
+This wires into the pipelines with different strictness:
+
+| Pipeline | Behavior | Why |
+| --- | --- | --- |
+| **CI** (`ci.yml`, on PR/branch push) | **Fails the build** on drift, before the evals run | Don't evaluate or merge a definition that doesn't match live. |
+| **CD** (`cd.yml`, on merge to main) | **Warns only** before deploy | Surfaces that the deploy will overwrite live PROD, without blocking a gated release. |
+
+To resolve a drift failure, run the capture and commit the result:
+
+```bash
+python evaluation/sync_from_snowflake.py --environment dev
+git add semantic_views/ agents/ && git commit -m "capture Snowsight edits"
+```
+
+> **Shared-dev caveat.** Because Stage 1 checks against the shared `dev` environment, a concurrent Snowsight edit by another developer can make the guard fail on a PR that didn't touch that object. This is the same shared-environment limitation noted below; per-developer isolation (Stage 2) removes it.
 
 ## Limitation: shared dev environment
 
