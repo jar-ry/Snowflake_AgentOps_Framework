@@ -99,3 +99,12 @@ git add semantic_views/ agents/ && git commit -m "capture Snowsight edits"
 ## Limitation: shared dev environment
 
 Stage 1 captures from the shared `dev` environment defined in `config/environments.yaml`. If several developers edit the **same** object in Snowsight at the same time, the last person to capture wins — concurrent edits are not isolated. For teams that need per-developer isolation, see the Stage 2 roadmap item (per-developer environments).
+
+### How this interacts with the drift guard
+
+Because the guard compares your committed `.yaml` against the **shared** live `dev`, another developer's change to that shared environment can make the guard fail your PR. Two cases:
+
+- **A different object changed.** The guard checks *all* configured objects, so if a teammate's change to `agent_B` merged to `main` while your branch still has the old `agent_B`, your PR fails on `agent_B` even though you only touched `agent_A`. **Fix:** rebase your branch on `main` to pick up their captured change. Nothing is lost.
+- **The same object changed.** If you and a teammate both edited the same object in Snowsight, that is a true conflict at the source (Snowsight is last-write-wins). The guard surfaces it as a failed build instead of silently evaluating/deploying the wrong definition. **Fix:** reconcile the two edits, re-capture, and commit.
+
+**Important:** the guard never discards your work — your changes live in the committed `.yaml` on your branch. A failed build blocks the PR until you reconcile (rebase or merge); it does not force you to start over. The clean solution to both cases is per-developer sandboxes (Stage 2 / #27), where each developer edits their own copy and the guard compares against *their* environment, removing cross-developer false failures entirely.
