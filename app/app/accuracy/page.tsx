@@ -2,6 +2,7 @@ import Grid from "@mui/material/Grid"
 import Box from "@mui/material/Box"
 
 import { querySnowflake } from "@/lib/snowflake"
+import { friendlyError } from "@/lib/errors"
 import { pivotByDate } from "@/lib/chart-data"
 import { parseWindow } from "@/lib/window"
 import { pickEnv } from "@/lib/env"
@@ -65,7 +66,7 @@ export default async function AccuracyPage({ searchParams }: Props) {
       ORDER BY eval_date ASC
     `)
   } catch (e) {
-    error = e instanceof Error ? e.message : "Unknown error"
+    error = friendlyError("accuracy", e)
   }
 
   const { data: chartData, seriesNames } = pivotByDate(chartRows, "EVAL_DATE", "TARGET_NAME", "ACCURACY_PCT")
