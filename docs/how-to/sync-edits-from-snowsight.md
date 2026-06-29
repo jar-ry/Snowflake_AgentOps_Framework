@@ -80,10 +80,14 @@ This wires into the pipelines with different strictness:
 
 | Pipeline | Behavior | Why |
 | --- | --- | --- |
-| **CI** (`ci.yml`, on PR/branch push) | **Fails the build** on drift, before the evals run | Don't evaluate or merge a definition that doesn't match live. |
-| **CD** (`cd.yml`, on merge to main) | **Warns only** before deploy | Surfaces that the deploy will overwrite live PROD, without blocking a gated release. |
+| **CI** (`ci.yml`, on PR/branch push) | **Fails the build** on drift, before the evals run | Don't evaluate or merge a definition that doesn't match live. Cheap to fix pre-merge, so blocking is appropriate. |
+| **CD** (`cd.yml`, on merge to main) | **Manual-approval gate** on the `prod` environment before deploy | At deploy time the committed release is *meant* to differ from live PROD, so a drift *warning* is either a no-op (empty prod lists) or fires on every release. The honest control for "about to overwrite live PROD" is a human approval, configured via the GitHub `prod` environment's required reviewers. |
 
-To resolve a drift failure, run the capture and commit the result:
+> **Set up the approval gate.** In the repo, go to **Settings → Environments → `prod`** and add **Required reviewers**. Until reviewers are configured, the `environment: prod` declaration is inert (the deploy runs unattended).
+
+> **Future enhancement — out-of-band prod drift.** A genuinely useful prod-side drift check compares live PROD against the *last-deployed* state (not the about-to-deploy HEAD), to catch someone hotfixing PROD in Snowsight outside the pipeline. That requires tracking the last-deployed baseline and is tracked separately.
+
+To resolve a CI drift failure, run the capture and commit the result:
 
 ```bash
 python evaluation/sync_from_snowflake.py --environment dev
