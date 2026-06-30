@@ -159,6 +159,17 @@ jobs:
     needs: gate
     runs-on: ubuntu-latest
 
+    # Production safety gate: require human approval before this job runs.
+    # Configure the 'prod' environment in repo Settings → Environments with
+    # "Required reviewers" so a release to live PROD cannot proceed unattended.
+    # This is the real control for "about to overwrite live PROD" — preferred
+    # over a silent drift warning, which (a) no-ops when prod object lists are
+    # empty and (b) fires on every normal release (committed always differs from
+    # live at deploy time). Detecting OUT-OF-BAND prod edits (live PROD vs the
+    # last-deployed state) is tracked as a future enhancement.
+    environment:
+      name: prod
+
     env:
       SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
       SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
