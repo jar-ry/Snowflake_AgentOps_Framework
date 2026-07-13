@@ -1,0 +1,23 @@
+definition_version: "2"
+
+entities:
+  agentops_monitoring:
+    type: snowflake-app
+    identifier:
+      name: AGENTOPS_MONITORING
+      database: USER$JARCHEN
+      schema: PUBLIC
+    artifacts:
+      - src: ./*
+        dest: ./
+        ignore:
+          - node_modules
+          - .env*
+          - __pycache__
+          - "*.pyc"
+          - .next
+          - .git
+          - snowflake.log
+
+    query_warehouse: RETAIL_AI_EVAL_WH
+    code_workspace: USER$JARCHEN.PUBLIC.SNOWFLAKE_APPS
