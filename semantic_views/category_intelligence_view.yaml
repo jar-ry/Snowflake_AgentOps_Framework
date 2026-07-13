@@ -1,127 +1,180 @@
-# Semantic View: CATEGORY_INTELLIGENCE_VIEW
-# FQN: BABY_MART_DEMO.ANALYTICS.CATEGORY_INTELLIGENCE_VIEW
-# Extracted from Snowflake — edit this file then deploy via CI/CD.
-
-fqn: BABY_MART_DEMO.ANALYTICS.CATEGORY_INTELLIGENCE_VIEW
-
+name: CATEGORY_INTELLIGENCE_VIEW
 tables:
-  - alias: CLV
-    source: BABY_MART_DEMO.ANALYTICS.DT_CLV_BY_BRAND
-  - alias: COMPETITIVE
-    source: BABY_MART_DEMO.ANALYTICS.DT_COMPETITIVE_POSITION
-  - alias: DIFOT
-    source: BABY_MART_DEMO.ANALYTICS.DT_SUPPLIER_DIFOT
-  - alias: PROMOTIONS
-    source: BABY_MART_DEMO.ANALYTICS.DT_PROMOTIONAL_EFFECTIVENESS
-  - alias: SEGMENTS
-    source: BABY_MART_DEMO.ANALYTICS.DT_CUSTOMER_SEGMENT_PERFORMANCE
-  - alias: SELLTHROUGH
-    source: BABY_MART_DEMO.ANALYTICS.DT_SELLTHROUGH_WEEKLY
-  - alias: SWITCHING
-    source: BABY_MART_DEMO.ANALYTICS.DT_BRAND_SWITCHING
-
-dimensions:
-  - table: CLV
-    column: BRAND_NAME
-    comment: Brand name
-  - table: CLV
-    column: CATEGORY
-    comment: Product category
-  - table: COMPETITIVE
-    column: BRAND_NAME
-    comment: Brand name
-  - table: COMPETITIVE
-    column: CATEGORY
-    comment: Product category
-  - table: COMPETITIVE
-    column: COMPETITOR_NAME
-    comment: "Competitor (Coles, Woolworths, Amazon AU, Chemist Warehouse)"
-  - table: COMPETITIVE
-    column: FISCAL_WEEK
-    comment: Fiscal week
-  - table: COMPETITIVE
-    column: FISCAL_YEAR
-    comment: Fiscal year
-  - table: DIFOT
-    column: BRAND_NAME
-    comment: Brand name
-  - table: DIFOT
-    column: CATEGORY
-    comment: Product category
-  - table: DIFOT
-    column: FISCAL_WEEK
-    comment: Fiscal week
-  - table: DIFOT
-    column: FISCAL_YEAR
-    comment: Fiscal year
-  - table: PROMOTIONS
-    column: BRAND_NAME
-    comment: Brand name
-  - table: PROMOTIONS
-    column: CATEGORY
-    comment: Product category
-  - table: PROMOTIONS
-    column: MECHANIC
-    comment: "Promotion mechanic (% Off, Bundle, GWP, BOGO, Multi-buy)"
-  - table: SEGMENTS
-    column: BRAND_NAME
-    comment: Brand name
-  - table: SEGMENTS
-    column: FISCAL_YEAR
-    comment: Fiscal year
-  - table: SEGMENTS
-    column: SEGMENT_NAME
-    comment: "Customer segment (First-time Parents, Second-time Parents, Gift Buyers, Grandparents, Expecting, Registry Shoppers)"
-  - table: SEGMENTS
-    column: SUPPLIER_NAME
-    comment: Supplier name
-  - table: SELLTHROUGH
-    column: BRAND_NAME
-    comment: Product brand name
-  - table: SELLTHROUGH
-    column: CATEGORY
-    comment: "Product category (Prams & Strollers, Car Seats, Nappies & Wipes, Clothing, Feeding)"
-  - table: SELLTHROUGH
-    column: CLASS
-    comment: Product sub-category
-  - table: SELLTHROUGH
-    column: FISCAL_WEEK
-    comment: Fiscal week number
-  - table: SELLTHROUGH
-    column: FISCAL_YEAR
-    comment: "Fiscal year (July-June)"
-  - table: SELLTHROUGH
-    column: REGION
-    comment: "Region type (Metro, Regional, CBD)"
-  - table: SELLTHROUGH
-    column: STATE
-    comment: "Australian state (VIC, NSW, QLD, SA, WA, TAS, ACT, NT)"
-  - table: SELLTHROUGH
-    column: STORE_NAME
-    comment: Store name
-  - table: SELLTHROUGH
-    column: SUPPLIER_NAME
-    comment: Supplier company name
-  - table: SWITCHING
-    column: CATEGORY
-    comment: Product category
-  - table: SWITCHING
-    column: CLASS
-    comment: Product class
-  - table: SWITCHING
-    column: FROM_BRAND
-    comment: Brand customers switched from
-  - table: SWITCHING
-    column: TO_BRAND
-    comment: Brand customers switched to
-
+  - name: CLV
+    base_table:
+      database: BABY_MART_DEMO
+      schema: ANALYTICS
+      table: DT_CLV_BY_BRAND
+    dimensions:
+      - name: BRAND_NAME
+        description: Brand name
+        expr: BRAND_NAME
+        data_type: VARCHAR(100)
+      - name: CATEGORY
+        description: Product category
+        expr: CATEGORY
+        data_type: VARCHAR(50)
+  - name: COMPETITIVE
+    base_table:
+      database: BABY_MART_DEMO
+      schema: ANALYTICS
+      table: DT_COMPETITIVE_POSITION
+    dimensions:
+      - name: BRAND_NAME
+        description: Brand name
+        expr: BRAND_NAME
+        data_type: VARCHAR(100)
+      - name: CATEGORY
+        description: Product category
+        expr: CATEGORY
+        data_type: VARCHAR(50)
+      - name: COMPETITOR_NAME
+        description: "Competitor (Coles, Woolworths, Amazon AU, Chemist Warehouse)"
+        expr: COMPETITOR_NAME
+        data_type: VARCHAR(50)
+      - name: FISCAL_WEEK
+        description: Fiscal week
+        expr: FISCAL_WEEK
+        data_type: "NUMBER(38,0)"
+      - name: FISCAL_YEAR
+        description: Fiscal year
+        expr: FISCAL_YEAR
+        data_type: "NUMBER(38,0)"
+  - name: DIFOT
+    base_table:
+      database: BABY_MART_DEMO
+      schema: ANALYTICS
+      table: DT_SUPPLIER_DIFOT
+    dimensions:
+      - name: BRAND_NAME
+        description: Brand name
+        expr: BRAND_NAME
+        data_type: VARCHAR(100)
+      - name: CATEGORY
+        description: Product category
+        expr: CATEGORY
+        data_type: VARCHAR(50)
+      - name: FISCAL_WEEK
+        description: Fiscal week
+        expr: FISCAL_WEEK
+        data_type: "NUMBER(38,0)"
+      - name: FISCAL_YEAR
+        description: Fiscal year
+        expr: FISCAL_YEAR
+        data_type: "NUMBER(38,0)"
+  - name: PROMOTIONS
+    base_table:
+      database: BABY_MART_DEMO
+      schema: ANALYTICS
+      table: DT_PROMOTIONAL_EFFECTIVENESS
+    dimensions:
+      - name: BRAND_NAME
+        description: Brand name
+        expr: BRAND_NAME
+        data_type: VARCHAR(100)
+      - name: CATEGORY
+        description: Product category
+        expr: CATEGORY
+        data_type: VARCHAR(50)
+      - name: MECHANIC
+        description: "Promotion mechanic (% Off, Bundle, GWP, BOGO, Multi-buy)"
+        expr: MECHANIC
+        data_type: VARCHAR(30)
+  - name: SEGMENTS
+    base_table:
+      database: BABY_MART_DEMO
+      schema: ANALYTICS
+      table: DT_CUSTOMER_SEGMENT_PERFORMANCE
+    dimensions:
+      - name: BRAND_NAME
+        description: Brand name
+        expr: BRAND_NAME
+        data_type: VARCHAR(100)
+      - name: FISCAL_YEAR
+        description: Fiscal year
+        expr: FISCAL_YEAR
+        data_type: "NUMBER(38,0)"
+      - name: SEGMENT_NAME
+        description: "Customer segment (First-time Parents, Second-time Parents, Gift Buyers, Grandparents, Expecting, Registry Shoppers)"
+        expr: SEGMENT_NAME
+        data_type: VARCHAR(50)
+      - name: SUPPLIER_NAME
+        description: Supplier name
+        expr: SUPPLIER_NAME
+        data_type: VARCHAR(100)
+  - name: SELLTHROUGH
+    base_table:
+      database: BABY_MART_DEMO
+      schema: ANALYTICS
+      table: DT_SELLTHROUGH_WEEKLY
+    dimensions:
+      - name: BRAND_NAME
+        description: Product brand name
+        expr: BRAND_NAME
+        data_type: VARCHAR(100)
+      - name: CATEGORY
+        description: "Product category (Prams & Strollers, Car Seats, Nappies & Wipes, Clothing, Feeding)"
+        expr: CATEGORY
+        data_type: VARCHAR(50)
+      - name: CLASS
+        description: Product sub-category
+        expr: CLASS
+        data_type: VARCHAR(50)
+      - name: FISCAL_WEEK
+        description: Fiscal week number
+        expr: FISCAL_WEEK
+        data_type: "NUMBER(38,0)"
+      - name: FISCAL_YEAR
+        description: Fiscal year (July-June)
+        expr: FISCAL_YEAR
+        data_type: "NUMBER(38,0)"
+      - name: REGION
+        description: "Region type (Metro, Regional, CBD)"
+        expr: REGION
+        data_type: VARCHAR(50)
+      - name: STATE
+        description: "Australian state (VIC, NSW, QLD, SA, WA, TAS, ACT, NT)"
+        expr: STATE
+        data_type: VARCHAR(3)
+      - name: STORE_NAME
+        description: Store name
+        expr: STORE_NAME
+        data_type: VARCHAR(100)
+      - name: SUPPLIER_NAME
+        description: Supplier company name
+        expr: SUPPLIER_NAME
+        data_type: VARCHAR(100)
+  - name: SWITCHING
+    base_table:
+      database: BABY_MART_DEMO
+      schema: ANALYTICS
+      table: DT_BRAND_SWITCHING
+    dimensions:
+      - name: CATEGORY
+        description: Product category
+        expr: CATEGORY
+        data_type: VARCHAR(50)
+      - name: CLASS
+        description: Product class
+        expr: CLASS
+        data_type: VARCHAR(50)
+      - name: FROM_BRAND
+        description: Brand customers switched from
+        expr: FROM_BRAND
+        data_type: VARCHAR(100)
+      - name: TO_BRAND
+        description: Brand customers switched to
+        expr: TO_BRAND
+        data_type: VARCHAR(100)
 verified_queries:
-  - question: "Which brands are losing the most customers in Nappies & Wipes?"
-    verified_by: Jarry Chen
+  - name: |-
+      "Which brands are losing the most customers in Nappies & Wipes?
+
+      "
+    sql: "SELECT FROM_BRAND, TO_BRAND, SUM(SWITCH_COUNT) AS customers_switched FROM BABY_MART_DEMO.ANALYTICS.VW_SUPPLIER_SWITCHING WHERE CATEGORY ILIKE 'Nappies & Wipes' GROUP BY FROM_BRAND, TO_BRAND ORDER BY customers_switched DESC NULLS LAST /* Generated by Cortex */;"
+    question: |+
+      Which brands are losing the most customers in Nappies & Wipes?
+
     verified_at: 1779105444
-    sql: |
-      SELECT FROM_BRAND, TO_BRAND, SUM(SWITCH_COUNT) AS customers_switched
-      FROM BABY_MART_DEMO.ANALYTICS.VW_SUPPLIER_SWITCHING
-      WHERE CATEGORY ILIKE 'Nappies & Wipes'
-      GROUP BY FROM_BRAND, TO_BRAND
-      ORDER BY customers_switched DESC NULLS LAST;
+    verified_by: Jarry Chen
+    use_as_onboarding_question: false
