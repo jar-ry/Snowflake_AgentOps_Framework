@@ -8,6 +8,7 @@ import { parseWindow } from "@/lib/window"
 import { pickEnv } from "@/lib/env"
 import { getEnvironments } from "@/lib/environments"
 import { safeIdent } from "@/lib/sql"
+import { S } from "@/lib/agentops.config"
 import { AgentFilter } from "../components/agent-filter"
 import { TimeWindow } from "../components/time-window"
 import { PageHeader } from "../components/layout/page-header"
@@ -38,7 +39,7 @@ export default async function AccuracyPage({ searchParams }: Props) {
 
   try {
     const agentRows = await querySnowflake(`
-      SELECT DISTINCT target_name FROM V_EVAL_ACCURACY_TREND ORDER BY 1
+      SELECT DISTINCT target_name FROM ${S}V_EVAL_ACCURACY_TREND ORDER BY 1
     `)
     agents = agentRows.map((r: any) => r.TARGET_NAME).filter(Boolean)
 
@@ -52,7 +53,7 @@ export default async function AccuracyPage({ searchParams }: Props) {
         threshold_pct,
         passed_threshold,
         accuracy_delta
-      FROM V_EVAL_ACCURACY_TREND
+      FROM ${S}V_EVAL_ACCURACY_TREND
       ${agentFilter}
       ORDER BY eval_date DESC
       LIMIT 50
@@ -60,7 +61,7 @@ export default async function AccuracyPage({ searchParams }: Props) {
 
     chartRows = await querySnowflake(`
       SELECT eval_date, eval_type, target_name, accuracy_pct, threshold_pct
-      FROM V_EVAL_ACCURACY_TREND
+      FROM ${S}V_EVAL_ACCURACY_TREND
       ${agentFilter}
       ${agentFilter ? "AND" : "WHERE"} eval_date >= DATEADD('day', -${win.days}, CURRENT_DATE())
       ORDER BY eval_date ASC

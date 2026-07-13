@@ -7,6 +7,7 @@ import { parseWindow } from "@/lib/window"
 import { pickEnv } from "@/lib/env"
 import { getEnvironments } from "@/lib/environments"
 import { safeIdent } from "@/lib/sql"
+import { S } from "@/lib/agentops.config"
 import { AgentFilter } from "./components/agent-filter"
 import { TimeWindow } from "./components/time-window"
 import { PageHeader } from "./components/layout/page-header"
@@ -41,7 +42,7 @@ export default async function Overview({ searchParams }: Props) {
 
   try {
     const agentRows = await querySnowflake(`
-      SELECT DISTINCT agent_or_sv_name FROM USAGE_METRICS ORDER BY 1
+      SELECT DISTINCT agent_or_sv_name FROM ${S}USAGE_METRICS ORDER BY 1
     `)
     agents = agentRows.map((r: any) => r.AGENT_OR_SV_NAME).filter(Boolean)
 
@@ -52,7 +53,7 @@ export default async function Overview({ searchParams }: Props) {
         COALESCE(SUM(failed_requests), 0) AS failed_7d,
         ROUND(COALESCE(SUM(estimated_credits), 0), 4) AS credits_7d,
         ROUND(COALESCE(AVG(avg_latency_ms), 0), 0) AS avg_latency_ms
-      FROM USAGE_METRICS
+      FROM ${S}USAGE_METRICS
       WHERE metric_date >= DATEADD('day', -${win.days}, CURRENT_DATE())
       ${agentFilter} ${envAnd}
     `)
@@ -64,7 +65,7 @@ export default async function Overview({ searchParams }: Props) {
         COALESCE(SUM(successful_requests), 0) AS successful_7d,
         ROUND(COALESCE(SUM(estimated_credits), 0), 4) AS credits_7d,
         ROUND(COALESCE(AVG(avg_latency_ms), 0), 0) AS avg_latency_ms
-      FROM USAGE_METRICS
+      FROM ${S}USAGE_METRICS
       WHERE metric_date >= DATEADD('day', -${win.days * 2}, CURRENT_DATE())
         AND metric_date <  DATEADD('day', -${win.days}, CURRENT_DATE())
       ${agentFilter} ${envAnd}
@@ -78,7 +79,7 @@ export default async function Overview({ searchParams }: Props) {
         CASE WHEN SUM(total_requests) > 0 THEN SUM(successful_requests) * 100.0 / SUM(total_requests) ELSE 0 END AS success_rate,
         SUM(estimated_credits) AS credits,
         AVG(avg_latency_ms) AS latency
-      FROM USAGE_METRICS
+      FROM ${S}USAGE_METRICS
       WHERE metric_date >= DATEADD('day', -${win.days}, CURRENT_DATE())
       ${agentFilter} ${envAnd}
       GROUP BY metric_date
@@ -88,7 +89,7 @@ export default async function Overview({ searchParams }: Props) {
     recentAlerts = await querySnowflake(`
       SELECT alert_type, severity, target_name, message,
              DATEDIFF('hour', created_at, CURRENT_TIMESTAMP()) AS hours_ago
-      FROM ALERT_HISTORY
+      FROM ${S}ALERT_HISTORY
       WHERE acknowledged = FALSE
       ${alertAgentFilter} ${envAnd}
       ORDER BY created_at DESC

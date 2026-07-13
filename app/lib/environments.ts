@@ -8,16 +8,16 @@
 import { cache } from "react"
 
 import { querySnowflake } from "./snowflake"
+import { S } from "./agentops.config"
 
 /** Distinct `environment` values in USAGE_METRICS, ordered. [] if unavailable. */
 export const getEnvironments = cache(async (): Promise<string[]> => {
   try {
     const rows = await querySnowflake(
-      "SELECT DISTINCT environment FROM USAGE_METRICS WHERE environment IS NOT NULL ORDER BY 1",
+      `SELECT DISTINCT environment FROM ${S}USAGE_METRICS WHERE environment IS NOT NULL ORDER BY 1`,
     )
     return rows.map((r: any) => r.ENVIRONMENT).filter(Boolean)
   } catch {
-    // Schema not reachable / not yet populated — render without an env filter.
     return []
   }
 })

@@ -8,6 +8,7 @@ import { parseWindow } from "@/lib/window"
 import { pickEnv } from "@/lib/env"
 import { getEnvironments } from "@/lib/environments"
 import { safeIdent } from "@/lib/sql"
+import { S } from "@/lib/agentops.config"
 import { AgentFilter } from "../components/agent-filter"
 import { TimeWindow } from "../components/time-window"
 import { PageHeader } from "../components/layout/page-header"
@@ -39,7 +40,7 @@ export default async function CostPage({ searchParams }: Props) {
 
   try {
     const agentRows = await querySnowflake(`
-      SELECT DISTINCT agent_or_sv_name FROM USAGE_METRICS WHERE agent_or_sv_name IS NOT NULL ORDER BY 1
+      SELECT DISTINCT agent_or_sv_name FROM ${S}USAGE_METRICS WHERE agent_or_sv_name IS NOT NULL ORDER BY 1
     `)
     agents = agentRows.map((r: any) => r.AGENT_OR_SV_NAME).filter(Boolean)
 
@@ -56,7 +57,7 @@ export default async function CostPage({ searchParams }: Props) {
         p95_latency_ms,
         rolling_7d_credits,
         error_rate_pct
-      FROM V_TOKEN_COST_TREND
+      FROM ${S}V_TOKEN_COST_TREND
       ${agentFilter}
       ORDER BY metric_date DESC
       LIMIT 30
@@ -69,7 +70,7 @@ export default async function CostPage({ searchParams }: Props) {
 
     creditsData = await querySnowflake(`
       SELECT metric_date, SUM(estimated_credits) AS credits
-      FROM V_TOKEN_COST_TREND
+      FROM ${S}V_TOKEN_COST_TREND
       ${dateFilter}
       GROUP BY metric_date
       ORDER BY metric_date ASC
@@ -77,7 +78,7 @@ export default async function CostPage({ searchParams }: Props) {
 
     latencyData = await querySnowflake(`
       SELECT metric_date, AVG(avg_latency_ms) AS avg_latency, MAX(p95_latency_ms) AS p95_latency
-      FROM V_TOKEN_COST_TREND
+      FROM ${S}V_TOKEN_COST_TREND
       ${dateFilter}
       GROUP BY metric_date
       ORDER BY metric_date ASC
@@ -85,7 +86,7 @@ export default async function CostPage({ searchParams }: Props) {
 
     serviceData = await querySnowflake(`
       SELECT metric_date, service_type, SUM(estimated_credits) AS credits
-      FROM V_TOKEN_COST_TREND
+      FROM ${S}V_TOKEN_COST_TREND
       ${dateFilter}
       GROUP BY metric_date, service_type
       ORDER BY metric_date ASC
