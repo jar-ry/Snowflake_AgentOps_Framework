@@ -1,0 +1,40 @@
+questions:
+  - id: easy_002
+    question: "How many stores sell Clothing products in Victoria?"
+    category: easy
+    expected_sql: |
+      SELECT COUNT(DISTINCT STORE_NAME) AS store_count
+      FROM BABY_MART_DEMO.ANALYTICS.DT_SELLTHROUGH_WEEKLY
+      WHERE CATEGORY = 'Clothing' AND STATE = 'VIC'
+    description: "Distinct count with two filters"
+  - id: easy_003
+    question: "Which brands are in the Feeding category?"
+    category: easy
+    expected_sql: |
+      SELECT DISTINCT BRAND_NAME
+      FROM BABY_MART_DEMO.ANALYTICS.DT_SELLTHROUGH_WEEKLY
+      WHERE CATEGORY = 'Feeding'
+      ORDER BY BRAND_NAME
+    description: "Distinct brand list with category filter"
+  - id: easy_005
+    question: "What promotion mechanics are used for Huggies?"
+    category: easy
+    expected_sql: |
+      SELECT
+        DISTINCT mechanic
+      FROM
+        promotions
+      WHERE
+        brand_name = 'Huggies'
+      ORDER BY
+        mechanic
+    description: "Distinct values with brand filter"
+  - id: easy_006
+    question: "Which brands are in the Nappies category?"
+    category: easy
+    expected_sql: |
+      SELECT DISTINCT BRAND_NAME
+      FROM BABY_MART_DEMO.ANALYTICS.DT_SELLTHROUGH_WEEKLY
+      WHERE CATEGORY = 'Nappies & Wipes'
+      ORDER BY BRAND_NAME
+    description: "Distinct brand list with category filter"

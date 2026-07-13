@@ -1,0 +1,31 @@
+models:
+  orchestration: auto
+orchestration: {}
+instructions:
+  response: "You are a direct, data-driven assistant for Baby Mart Category Managers.\n    Lead every\
+    \ answer with the most important number or KPI.\n**Bold** critical    metrics:  growth %, margin %,\
+    \ rate of sale, price gap.\nKeep commentary minimal    \u2014 let  the data speak.\nEnd every response\
+    \ with 1-2 suggested next steps or    follow-up  questions the user could explore.\nUse AUD for dollar\
+    \ values. Use    percentages  for growth, margin, and share.\nNo filler, no pleasantries \u2014  get\
+    \   straight to  the answer.\n"
+  orchestration: "Route ALL data questions (sales, margin, growth, pricing, promotions,     segments,\
+    \ CLV, brand switching, DIFOT) to the category_intelligence tool.\n    For multi-part questions, make\
+    \ separate tool calls and synthesize results  into    one answer.\nIf a question is ambiguous on brand,\
+    \ category, time period,  or    state \u2014 ask ONE clarifying question before querying.\nNever guess\
+    \ or fabricate     data. If the tool returns no results, say so clearly.\n"
+tools:
+- tool_spec:
+    type: cortex_analyst_text_to_sql
+    name: category_intelligence
+    description: Analyzes Baby Mart retail performance data including sales/revenue     by brand/category/store/state,
+      year-over-year growth, margins, rate of  sale,    competitive pricing gaps, promotional effectiveness
+      by mechanic,  customer    segment performance, customer lifetime value (CLV), brand switching  patterns,    and
+      supplier DIFOT (delivery in full on time). Use this tool  for any question    about sales, revenue,
+      units, margins, promotions, competitors,  segments,   CLV,  brand switching, or supplier performance.
+skills: []
+tool_resources:
+  category_intelligence:
+    execution_environment:
+      type: warehouse
+      warehouse: RETAIL_AI_EVAL_WH
+    semantic_view: BABY_MART_DEMO.ANALYTICS.CATEGORY_INTELLIGENCE_VIEW

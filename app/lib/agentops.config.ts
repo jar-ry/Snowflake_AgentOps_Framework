@@ -7,8 +7,9 @@
 // targets its own schema.
 //
 // Runtime env vars SNOWFLAKE_DATABASE / SNOWFLAKE_SCHEMA override these.
-export const FRAMEWORK_DB = ""
-export const FRAMEWORK_SCHEMA = ""
+export const FRAMEWORK_DB = "BABY_MART_DEMO"
+export const FRAMEWORK_SCHEMA = "AGENTOPS"
+
 
 // Fully qualified schema prefix for SQL queries.
 // When populated: "MY_DB.MY_SCHEMA." — when empty: "" (relies on session context).

@@ -1,0 +1,7 @@
+questions:
+  - id: ambiguous_001
+    question: "What are the top selling brands?"
+    category: ambiguous
+    evaluation_criteria: |
+      Should ask a clarifying question — no category, time period, or metric specified.
+      Per agent instructions, it should ask ONE clarifying question before querying.

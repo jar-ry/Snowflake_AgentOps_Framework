@@ -1,0 +1,55 @@
+questions:
+  - id: hard_001
+    question: "Which brands are losing the most customers in Nappies & Wipes?"
+    category: hard
+    expected_sql: |
+      SELECT
+        from_brand,
+        category,
+        COUNT(*) AS switch_away_count
+      FROM
+        switching
+      WHERE
+        category = 'Nappies & Wipes'
+      GROUP BY
+        from_brand,
+        category
+      ORDER BY
+        switch_away_count DESC NULLS LAST
+    description: "Brand switching outflow aggregation"
+  - id: hard_002
+    question: "What is the total revenue by brand for Nappies & Wipes in fiscal year 2025?"
+    category: hard
+    expected_sql: |
+      SELECT
+        from_brand,
+        category,
+        class,
+        COUNT(*) AS switch_outflow_count
+      FROM
+        switching
+      GROUP BY
+        from_brand,
+        category,
+        class
+      ORDER BY
+        switch_outflow_count DESC NULLS LAST
+    description: "Revenue by brand with category and year filter"
+  - id: hard_006
+    question: "Which brand are customers switching to most in the Car Seats category?"
+    category: hard
+    expected_sql: |
+      SELECT
+        to_brand,
+        COUNT(*) AS switch_count
+      FROM
+        switching
+      WHERE
+        category = 'Car Seats'
+      GROUP BY
+        to_brand
+      ORDER BY
+        switch_count DESC NULLS LAST
+      LIMIT
+        1
+    description: "Brand switching incoming aggregation"

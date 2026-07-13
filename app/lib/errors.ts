@@ -17,8 +17,7 @@
  * @returns a generic, viewer-safe message containing a correlation ref
  */
 export function friendlyError(context: string, e: unknown): string {
-  const ref = Math.random().toString(36).slice(2, 8)
-  const detail = e instanceof Error ? (e.stack ?? e.message) : String(e)
-  console.error(`[agentops] ${context} failed (ref=${ref}): ${detail}`)
-  return `Unable to load this data right now. If this persists, contact your administrator (ref: ${ref}).`
+  const detail = e instanceof Error ? e.message : String(e)
+  console.error(`[agentops] ${context} failed: ${e instanceof Error ? (e.stack ?? e.message) : String(e)}`)
+  return `[${context}] ${detail}`
 }
