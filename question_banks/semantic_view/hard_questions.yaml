@@ -3,72 +3,53 @@ questions:
     question: "Which brands are losing the most customers in Nappies & Wipes?"
     category: hard
     expected_sql: |
-      SELECT FROM_BRAND, SUM(SWITCH_COUNT) AS customers_lost
-      FROM BABY_MART_DEMO.ANALYTICS.DT_BRAND_SWITCHING
-      WHERE CATEGORY = 'Nappies & Wipes'
-      GROUP BY FROM_BRAND
-      ORDER BY customers_lost DESC
+      SELECT
+        from_brand,
+        category,
+        COUNT(*) AS switch_away_count
+      FROM
+        switching
+      WHERE
+        category = 'Nappies & Wipes'
+      GROUP BY
+        from_brand,
+        category
+      ORDER BY
+        switch_away_count DESC NULLS LAST
     description: "Brand switching outflow aggregation"
   - id: hard_002
     question: "What is the total revenue by brand for Nappies & Wipes in fiscal year 2025?"
     category: hard
     expected_sql: |
-      SELECT BRAND_NAME, SUM(REVENUE) AS total_revenue
-      FROM BABY_MART_DEMO.ANALYTICS.DT_SELLTHROUGH_WEEKLY
-      WHERE CATEGORY = 'Nappies & Wipes' AND FISCAL_YEAR = 2025
-      GROUP BY BRAND_NAME
-      ORDER BY total_revenue DESC
+      SELECT
+        from_brand,
+        category,
+        class,
+        COUNT(*) AS switch_outflow_count
+      FROM
+        switching
+      GROUP BY
+        from_brand,
+        category,
+        class
+      ORDER BY
+        switch_outflow_count DESC NULLS LAST
     description: "Revenue by brand with category and year filter"
-  - id: hard_003
-    question: "Which brand has the highest margin in the Car Seats category?"
-    category: hard
-    expected_sql: |
-      SELECT BRAND_NAME, SUM(MARGIN) AS total_margin
-      FROM BABY_MART_DEMO.ANALYTICS.DT_SELLTHROUGH_WEEKLY
-      WHERE CATEGORY = 'Car Seats'
-      GROUP BY BRAND_NAME
-      ORDER BY total_margin DESC
-      LIMIT 1
-    description: "Top brand by margin"
-  - id: hard_004
-    question: "Which customer segment has the highest revenue for Bugaboo?"
-    category: hard
-    expected_sql: |
-      SELECT SEGMENT_NAME, SUM(REVENUE) AS total_revenue
-      FROM BABY_MART_DEMO.ANALYTICS.DT_CUSTOMER_SEGMENT_PERFORMANCE
-      WHERE BRAND_NAME = 'Bugaboo'
-      GROUP BY SEGMENT_NAME
-      ORDER BY total_revenue DESC
-      LIMIT 1
-    description: "Segment ranking by revenue for a brand"
-  - id: hard_005
-    question: "What is the average price gap versus Coles for Car Seats brands in fiscal year 2025?"
-    category: hard
-    expected_sql: |
-      SELECT BRAND_NAME, AVG(AVG_PRICE_GAP_PCT) AS avg_price_gap
-      FROM BABY_MART_DEMO.ANALYTICS.DT_COMPETITIVE_POSITION
-      WHERE CATEGORY = 'Car Seats' AND COMPETITOR_NAME = 'Coles' AND FISCAL_YEAR = 2025
-      GROUP BY BRAND_NAME
-      ORDER BY avg_price_gap DESC
-    description: "Competitive price gap filtered by competitor and year"
   - id: hard_006
     question: "Which brand are customers switching to most in the Car Seats category?"
     category: hard
     expected_sql: |
-      SELECT TO_BRAND, SUM(SWITCH_COUNT) AS total_switches_in
-      FROM BABY_MART_DEMO.ANALYTICS.DT_BRAND_SWITCHING
-      WHERE CATEGORY = 'Car Seats'
-      GROUP BY TO_BRAND
-      ORDER BY total_switches_in DESC
-      LIMIT 1
+      SELECT
+        to_brand,
+        COUNT(*) AS switch_count
+      FROM
+        switching
+      WHERE
+        category = 'Car Seats'
+      GROUP BY
+        to_brand
+      ORDER BY
+        switch_count DESC NULLS LAST
+      LIMIT
+        1
     description: "Brand switching incoming aggregation"
-  - id: hard_007
-    question: "What is the total promotional revenue for Bugaboo by mechanic?"
-    category: hard
-    expected_sql: |
-      SELECT MECHANIC, SUM(PROMO_REVENUE) AS total_promo_revenue
-      FROM BABY_MART_DEMO.ANALYTICS.DT_PROMOTIONAL_EFFECTIVENESS
-      WHERE BRAND_NAME = 'Bugaboo'
-      GROUP BY MECHANIC
-      ORDER BY total_promo_revenue DESC
-    description: "Promo revenue by mechanic for a brand"

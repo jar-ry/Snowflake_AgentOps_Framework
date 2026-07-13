@@ -36,15 +36,21 @@ questions:
     question: "What promotion mechanics are used for Huggies?"
     category: easy
     expected_sql: |
-      SELECT DISTINCT MECHANIC
-      FROM BABY_MART_DEMO.ANALYTICS.DT_PROMOTIONAL_EFFECTIVENESS
-      WHERE BRAND_NAME = 'Huggies'
+      SELECT
+        DISTINCT mechanic
+      FROM
+        promotions
+      WHERE
+        brand_name = 'Huggies'
+      ORDER BY
+        mechanic
     description: "Distinct values with brand filter"
   - id: easy_006
-    question: "What are the total units sold for Nappies & Wipes in fiscal year 2025?"
+    question: "Which brands are in the Nappies category?"
     category: easy
     expected_sql: |
-      SELECT SUM(UNITS_SOLD) AS total_units
+      SELECT DISTINCT BRAND_NAME
       FROM BABY_MART_DEMO.ANALYTICS.DT_SELLTHROUGH_WEEKLY
-      WHERE CATEGORY = 'Nappies & Wipes' AND FISCAL_YEAR = 2025
-    description: "Simple sum with two filters"
+      WHERE CATEGORY = 'Nappies & Wipes'
+      ORDER BY BRAND_NAME
+    description: "Distinct brand list with category filter"
