@@ -1,12 +1,4 @@
 questions:
-  - id: easy_001
-    question: "What is the total revenue for the Prams & Strollers category in fiscal year 2025?"
-    category: easy
-    expected_sql: |
-      SELECT SUM(REVENUE) AS total_revenue
-      FROM BABY_MART_DEMO.ANALYTICS.DT_SELLTHROUGH_WEEKLY
-      WHERE CATEGORY = 'Prams & Strollers' AND FISCAL_YEAR = 2025
-    description: "Single-table filtered aggregation"
   - id: easy_002
     question: "How many stores sell Clothing products in Victoria?"
     category: easy
@@ -24,14 +16,6 @@ questions:
       WHERE CATEGORY = 'Feeding'
       ORDER BY BRAND_NAME
     description: "Distinct brand list with category filter"
-  - id: easy_004
-    question: "What is the average DIFOT percentage for Huggies?"
-    category: easy
-    expected_sql: |
-      SELECT AVG(DIFOT_PCT) AS avg_difot
-      FROM BABY_MART_DEMO.ANALYTICS.DT_SUPPLIER_DIFOT
-      WHERE BRAND_NAME = 'Huggies'
-    description: "Simple average on supplier DIFOT"
   - id: easy_005
     question: "What promotion mechanics are used for Huggies?"
     category: easy

@@ -5,14 +5,3 @@ questions:
     evaluation_criteria: |
       Should ask a clarifying question — no category, time period, or metric specified.
       Per agent instructions, it should ask ONE clarifying question before querying.
-  - id: ambiguous_002
-    question: "How is Huggies performing?"
-    category: ambiguous
-    evaluation_criteria: |
-      Should ask what aspect of performance: sales, margin, DIFOT, CLV, or promotions.
-      A single clarifying question is expected before querying.
-  - id: ambiguous_003
-    question: "Show me trends."
-    category: ambiguous
-    evaluation_criteria: |
-      Should ask what trends (sales, margin, switching), for which category/brand, and time period.
