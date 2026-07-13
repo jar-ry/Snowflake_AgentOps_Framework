@@ -15,7 +15,7 @@ from datetime import datetime
 # Config resolution
 #
 # The framework is domain-agnostic. Configuration lives in <repo_root>/config/:
-#   - defaults.yaml       — universal LLM/pricing defaults
+#   - defaults.yaml       — universal LLM model defaults
 #   - environments.yaml   — your project's semantic views, agents, framework DB
 #   - thresholds.yaml     — eval accuracy thresholds
 #   - monitoring.yaml     — alert thresholds
@@ -175,7 +175,7 @@ def get_connection(environment: str = "dev") -> snowflake.connector.SnowflakeCon
 
 @functools.lru_cache(maxsize=None)
 def _load_config_cached(cfg_dir: str) -> dict:
-    # Framework defaults (llm, pricing) merged UNDER the instance config.
+    # Framework defaults (llm) merged UNDER the instance config.
     defaults = _read_yaml(os.path.join(cfg_dir, "defaults.yaml"))
     instance = _read_yaml(os.path.join(cfg_dir, "environments.yaml"))
     return _deep_merge(defaults, instance)

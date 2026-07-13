@@ -1,16 +1,35 @@
 # Cost model
 
-> Status: Stable | Last reviewed: 2026-06-04 | Audience: Engineers, solution architects, customers
+> Status: Stable | Last reviewed: 2026-07-13 | Audience: Engineers, solution architects, customers
 
-**Purpose.** Explain how the framework's evaluation cost is computed, in Snowflake AI Credits, so teams can estimate and budget spend before adopting it.
+**Purpose.** Explain how agent cost is tracked and how to estimate evaluation spend in Snowflake AI Credits.
 
 ## Canonical unit: Snowflake AI Credits
 
-All cost in this framework is denominated in **Snowflake AI Credits**, not US dollars. The monitoring schema stores cost in the `estimated_credits` column ([setup/00_framework_tables.sql](../../setup/00_framework_tables.sql)), computed from real per-model token counts using the rate table in the `pricing:` block of [config/defaults.yaml](../../config/defaults.yaml).
+All cost in this framework is denominated in **Snowflake AI Credits**, not US dollars. Dollar cost depends on your Snowflake contract's credit price, which varies by edition, region, and commitment.
 
-Dollar cost depends on your Snowflake contract's credit price, which varies by edition, region, and commitment. This document therefore quotes credits only.
+## Cost data source
 
-> Note: some demo materials loosely quote figures like "$5 per run" and "$1 per credit". Those are illustrative only and are not the canonical model. They are flagged for correction in the demo docs.
+The framework uses **`SNOWFLAKE.ACCOUNT_USAGE.CORTEX_AGENT_USAGE_HISTORY`** as the authoritative source of credit consumption. This view provides one row per agent call with the `TOKEN_CREDITS` column — the exact credits billed by Snowflake, broken down by agent, user, and request.
+
+The daily aggregation task (`TASK_DAILY_USAGE_AGGREGATION`) reads from this view and writes to `USAGE_METRICS`:
+
+```sql
+SELECT
+    START_TIME::DATE AS metric_date,
+    AGENT_DATABASE_NAME AS environment,
+    AGENT_NAME AS agent_or_sv_name,
+    COUNT(*) AS total_requests,
+    SUM(TOKEN_CREDITS) AS estimated_credits,  -- actual billed credits
+    ...
+FROM SNOWFLAKE.ACCOUNT_USAGE.CORTEX_AGENT_USAGE_HISTORY
+WHERE START_TIME::DATE = CURRENT_DATE() - 1
+GROUP BY 1, 2, 3
+```
+
+No hardcoded per-model token-to-credit conversion rates are used. Snowflake computes credits server-side using the actual model and token counts.
+
+> **Caveat:** `CORTEX_AGENT_USAGE_HISTORY` excludes requests from Snowflake CoWork / Snowflake Intelligence — those are in `SNOWFLAKE_INTELLIGENCE_USAGE_HISTORY` instead.
 
 ## Two loops, two cost profiles
 
@@ -19,13 +38,11 @@ The framework has two evaluation loops with very different cost characteristics:
 | Loop | What it is | Cost driver | Approximate cost |
 | --- | --- | --- | --- |
 | Loop 1 (CI eval) | Agent run against a question bank, scored by an LLM judge | LLM tokens (agent + judge) | The subject of this document |
-| Loop 2 (runtime monitoring) | Deterministic SQL rules over `ai_observability_events` | Warehouse compute only | No LLM tokens; cost is limited to short daily task runs on the configured warehouse |
+| Loop 2 (runtime monitoring) | Deterministic SQL rules over `ai_observability_events` | Warehouse compute only | No LLM tokens; negligible |
 
-Loop 2 is pure SQL aggregation on an XSMALL warehouse running short daily tasks. Its cost is negligible and not modeled here. The rest of this document is about Loop 1.
+Loop 2 is pure SQL aggregation on an XSMALL warehouse. The rest of this document is about Loop 1.
 
-> These two loops map onto the [three pillars](../README.md#explanation--the-three-pillars): Loop 1 is **Pillar 2** (output evaluation); Loop 2 is **Pillar 3** (runtime monitoring). **Pillar 1** (input governance) is a free, pre-CI structural audit that makes no LLM calls, so it is not modeled here either.
-
-## How Loop 1 cost is computed
+## How Loop 1 cost works
 
 For each evaluation run, the framework:
 
@@ -34,46 +51,30 @@ For each evaluation run, the framework:
 
 So a single question with `M` metrics costs: one agent invocation plus `M` judge invocations.
 
-### Token assumptions (measured)
+### Typical token profile (measured)
 
-These figures are **calibrated against real eval runs**, not guessed. The agent values are measured medians from the framework's `AGENT_TRACES` view (the `sample` in [config/defaults.yaml](../../config/defaults.yaml) `token_assumptions:`); the judge values remain estimates because judge tokens are not exposed in observability. Always prefer measured actuals (see "Measuring actuals") over any planning figure.
+These figures are calibrated against real eval runs — measured medians from the framework's `AGENT_TRACES` view. Your token counts depend on your semantic model size, tools, and step count.
 
 | Component | Input tokens | Cache-read input | Output tokens | Source |
 | --- | --- | --- | --- | --- |
 | Agent invocation (per question) | ~195,000 | ~116,000 (~85%) | ~410 | measured median |
-| Judge invocation (per metric per question) | ~1,200 | n/a | ~300 | estimate (unmeasured) |
+| Judge invocation (per metric per question) | ~1,200 | n/a | ~300 | estimate |
 
-**Cache reads dominate the agent input.** A multi-step agent re-reads a large, mostly-cached context on every step, so ~85% of its input tokens are served from the prompt cache and billed at the much cheaper `cache_read_credits_per_million` rate -- not the full input rate. The credit formula ([evaluation/utils.py](../../evaluation/utils.py) `build_credits_expr`) charges `(input - cache_read)` at the input rate, `cache_read` at the cache rate, and `output` at the output rate. Ignoring the cache split (as earlier versions did) over-states agent cost ~5x.
-
-### Per-model rates
-
-Credits are computed from the model's input, cache-read, and output rates (credits per million tokens) in [config/defaults.yaml](../../config/defaults.yaml) (carries a `last_verified` date -- **estimates only; confirm against your Snowflake Service Consumption Table**, as rates drift). The default evaluation and judge model is `claude-opus-4-7`:
-
-| Rate | Credits per million tokens |
-| --- | --- |
-| Input | 3.25 |
-| Cache-read input | 0.33 |
-| Output | 16.26 |
+**Cache reads dominate the agent input.** ~85% of input tokens are served from prompt cache at a much cheaper rate, so naive total-token cost estimates overstate actual spend by ~5x.
 
 ### Per-question credit estimate
 
-Using the measured agent profile above with `claude-opus-4-7` and the default eight metrics (`answer_correctness`, `logical_consistency`, `safety`, `groundedness`, `execution_efficiency`, `answer_relevance`, `conciseness`, `pii_leakage`):
+Using `claude-opus-4-7` with eight metrics:
 
-- Agent (cache-aware, measured): **~0.22 credits** per question (mean; median ~0.11 -- the distribution is right-skewed by occasional long multi-step questions). Use the mean for budgeting totals.
-- Judges (8, estimated): `8 x (1200/1e6 x 3.25 + 300/1e6 x 16.26)` = approximately `0.070` credits
-- **Per question: approximately `0.29` credits**
+- Agent (cache-aware, measured): **~0.22 credits** per question (mean)
+- Judges (8 metrics): ~0.07 credits
+- **Per question total: ~0.29 credits**
 
-> Metric count is a direct cost lever: each judge metric is one extra `AI_COMPLETE` call per question, so judge cost scales linearly with the metric set. The set is configurable per environment in `thresholds.yaml` (`agent.<env>.metrics`) -- drop metrics you do not need to cut judge cost by `1/M` each. Cost/latency/step-count are derived deterministically from the eval results table (no judge call), so they add no judge cost.
-
-> This is ~2.7x higher than the previous guessed figure (`0.096`), which assumed only ~6,000 agent input tokens. Calibration moved the estimate up on the agent side (far more tokens than assumed) even though cache-aware billing moved the *per-token* cost down. Your agent's token counts depend on your semantic model size, tools, and step count -- measure your own.
+> Metric count is a direct cost lever: each metric is one `AI_COMPLETE` call per question. The metric set is configurable per environment in `thresholds.yaml` (`agent.<env>.metrics`).
 
 ## Lifecycle cost formula
 
-An evaluation runs on every CI trigger that touches a watched path (`agents/`, `semantic_views/`, `question_banks/`, `config/`, `evaluation/`). Across a feature's life:
-
 ```text
-E = number of promotion environments (e.g. DEV + STAGING + PROD = 3)
-
 total_eval_runs = feature_branch_commits_touching_watched_paths
                 + E   (one eval per promotion gate)
 
@@ -83,62 +84,41 @@ cost_credits = total_eval_runs
              x per_question_credits
 ```
 
-`per_question_credits` is approximately `0.29` for the default model and eight metrics (see above). `num_agents_changed` is usually 1 (a PR typically changes one agent); multi-agent PRs multiply accordingly. `E` depends on how many environments your pipeline promotes through — a minimal setup has 2 (DEV + PROD), while enterprise setups may have 3 or more (DEV + STAGING + PROD).
-
 ## Worked examples
 
-All figures are estimates in AI Credits, assuming `claude-opus-4-7`, eight metrics, `per_question_credits` approximately `0.29` (cache-aware; agent measured + judge estimate), one agent changed per PR, and `E = 2` environments (DEV + PROD). Scale `E` for your pipeline. These are derived from the bundled retail example's measured agent profile; your own token counts will differ.
+Assuming `claude-opus-4-7`, eight metrics, ~0.29 credits/question, one agent per PR, E=2 environments:
 
-### Small team
-
-- 1 agent, 20-question bank, ~3 commits per PR, 5 PRs per week
-- Per run: `20 x 0.29` = approximately `5.8` credits
-- Per PR: `(3 + E) runs x 5.8` = `(3 + 2) x 5.8` = approximately `29` credits
-- **Per week: `5 x 29` = approximately 145 credits**
-
-### Medium team
-
-- 5 agents (1 changed per PR), 35-question bank, ~4 commits per PR, 50 PRs per week
-- Per run: `35 x 0.29` = approximately `10.2` credits
-- Per PR: `(4 + E) runs x 10.2` = `(4 + 2) x 10.2` = approximately `61` credits
-- **Per week: `50 x 61` = approximately 3,050 credits**
-
-### Large team
-
-- 20 agents (1 changed per PR), 50-question bank, ~5 commits per PR, 200 PRs per week
-- Per run: `50 x 0.29` = approximately `14.5` credits
-- Per PR: `(5 + E) runs x 14.5` = `(5 + 2) x 14.5` = approximately `102` credits
-- **Per week: `200 x 102` = approximately 20,400 credits**
+| Scenario | Bank size | Commits/PR | PRs/week | Credits/week |
+| --- | --- | --- | --- | --- |
+| Small team | 20 | 3 | 5 | ~145 |
+| Medium team | 35 | 4 | 50 | ~3,050 |
+| Large team | 50 | 5 | 200 | ~20,400 |
 
 ## Levers to reduce cost
 
-- **Pre-flight smoke check.** Run a 3-question smoke set before the full bank. A broken agent aborts at roughly `0.3` credits instead of running the full bank. This is the single biggest saver on iterative feature branches.
-- **Tiered question banks.** Run a small subset on feature-branch commits (advisory) and the full bank only on merge to main. Cuts feature-branch cost by the ratio of the subsets.
-- **Metric pruning.** Each judge metric is a judge call per question. The metric set is configurable per environment (`thresholds.yaml` `agent.<env>.metrics`); dropping a metric you do not need (for example `groundedness`) removes one judge call per question, reducing judge cost by roughly `1/M`. Cost, latency, and step-count are derived from the eval results table deterministically, so prefer those over a judge metric when the signal is numeric.
-- **Cheaper judge model.** The judge model is configurable. A less expensive model (for example a Haiku-class model) lowers judge cost substantially, at some loss of judging nuance.
-
-## Architecture note: why per-record, not batched
-
-The framework scores each (question, metric) pair as its own judge call. A batched alternative — one judge call scoring all answers for a metric — would cut judge tokens by roughly 30 percent. It was rejected because it loses per-question explainability (the `EVAL_CALLS` rationale per record), breaks the Snowsight Evaluations UI integration, and abandons the native `EXECUTE_AI_EVALUATION` API. The modest savings did not justify those losses.
+- **Pre-flight smoke check.** Run a 3-question subset before the full bank.
+- **Tiered question banks.** Small subset on feature branches, full bank on merge to main.
+- **Metric pruning.** Drop metrics you don't need — each removed metric saves 1 judge call/question.
+- **Cheaper judge model.** Configurable via `defaults.yaml` — a Haiku-class model is much cheaper.
 
 ## Measuring actuals
 
-Estimates are for planning. To see real cost, query the monitoring schema, which aggregates `estimated_credits` from measured token counts:
+Query the monitoring schema for real cost data (sourced from `CORTEX_AGENT_USAGE_HISTORY`):
 
 ```sql
-SELECT metric_date, service_type, agent_or_sv_name, total_tokens, estimated_credits
+SELECT metric_date, agent_or_sv_name, total_requests, estimated_credits, total_tokens
 FROM {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.USAGE_METRICS
 ORDER BY metric_date DESC;
 ```
 
-The dashboard's Token Costs tab visualizes the same data over time.
+The dashboard's Cost tab visualizes this over time.
 
-## Reconciling estimates against actuals
+## Reconciling against account-level spend
 
-Estimates (token assumptions + per-token rates) drift. To catch this, [evaluation/cost_reconcile.py](../../evaluation/cost_reconcile.py) compares the framework's modeled `estimated_credits` (from `USAGE_METRICS`) against ground-truth account AI spend (`SNOWFLAKE.ACCOUNT_USAGE.METERING_DAILY_HISTORY`, `service_type = 'AI_SERVICES'`) over a window and flags when the estimate materially exceeds actuals (over-charging):
+[evaluation/cost_reconcile.py](../../evaluation/cost_reconcile.py) compares the framework's `estimated_credits` against ground-truth account AI spend (`SNOWFLAKE.ACCOUNT_USAGE.METERING_DAILY_HISTORY`, `service_type = 'AI_SERVICES'`):
 
 ```bash
 python evaluation/cost_reconcile.py --environment dev --days 30
 ```
 
-The actual figure is broader than the estimate (it also includes judge calls and any other Cortex usage), so a healthy state is `estimated <= actual`. Reading the metering view requires `IMPORTED PRIVILEGES ON DATABASE SNOWFLAKE`, so run this as an admin role (it is not part of the deployer CI path).
+Since `estimated_credits` now comes directly from `CORTEX_AGENT_USAGE_HISTORY`, the reconciliation should show close alignment. The metering view is broader (includes all AI services), so `estimated <= actual` is the expected healthy state.

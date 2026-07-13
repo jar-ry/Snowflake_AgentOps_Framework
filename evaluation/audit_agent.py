@@ -480,14 +480,12 @@ def get_low_score_details(conn, database: str, schema: str, agent_name: str, run
 
 
 def compute_deterministic_signals(eval_results: list) -> dict:
-    """Derive non-judge signals (latency, tokens, step proxy, est. credits) from
-    the eval results table -- no extra LLM-judge calls.
+    """Derive non-judge signals (latency, tokens, LLM calls) from the eval results
+    table -- no extra LLM-judge calls needed.
 
     GET_AI_EVALUATION_DATA returns one row per (record, metric), so per-record
     fields (DURATION_MS, token counts, LLM_CALL_COUNT) repeat across a record's
-    metric rows. We dedupe by RECORD_ID before averaging. Credits are estimated
-    from the configured model's pricing in defaults.yaml (input+output only; the
-    results table does not expose the cache split, so this is approximate).
+    metric rows. We dedupe by RECORD_ID before averaging.
     """
     by_record = {}
     for row in eval_results:

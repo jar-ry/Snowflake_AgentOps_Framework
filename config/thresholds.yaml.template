@@ -49,7 +49,6 @@ agent:
     # WARN-ONLY: surfaced for visibility, they do NOT change the pass/fail gate.
     deterministic_limits:
       max_avg_latency_ms: 60000
-      max_avg_credits_per_question: 1.0
       max_avg_llm_calls: 40
 
   dev:

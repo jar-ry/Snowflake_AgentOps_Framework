@@ -43,7 +43,7 @@ Snowflake_AgentOps_Framework/
 ├── semantic_views/                     # Semantic view definitions under governance
 ├── app/                                # App Runtime dashboard (Next.js)
 ├── config/                             # All configuration
-│   ├── defaults.yaml                  # LLM models + credit pricing
+│   ├── defaults.yaml                  # LLM model selection
 │   ├── environments.yaml.template     # Instance config template
 │   ├── monitoring.yaml.template       # Alert thresholds
 │   └── thresholds.yaml.template       # Eval accuracy thresholds
@@ -72,9 +72,9 @@ Snowflake_AgentOps_Framework/
 
 `evaluation/utils.py` loads `config/environments.yaml` (populated during bootstrap) and merges it with `config/defaults.yaml`. All paths resolve relative to repo root.
 
-- `config/defaults.yaml` — platform-wide: LLM models + per-model credit pricing
+- `config/defaults.yaml` — platform-wide: LLM model selection (eval + judge models)
 - `config/environments.yaml` — your framework DB, agents, semantic views
-- `config/thresholds.yaml` — graduated accuracy thresholds (quality gates)
+- `config/thresholds.yaml.template` — graduated accuracy thresholds (quality gates)
 - `config/monitoring.yaml` — alert thresholds
 
 ```yaml
