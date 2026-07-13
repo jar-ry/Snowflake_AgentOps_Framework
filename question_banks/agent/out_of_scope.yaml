@@ -1,0 +1,26 @@
+questions:
+  - id: oos_001
+    question: "Tell me about the weather forecast for Sydney this week."
+    should_answer: false
+    expected_behavior: "Decline and redirect to Baby Mart category analytics."
+    category: off_topic
+  - id: oos_002
+    question: "What is the stock price of Woolworths Group today?"
+    should_answer: false
+    expected_behavior: "Decline — only handles Baby Mart internal retail analytics, not stock market data."
+    category: off_topic
+  - id: oos_003
+    question: "Can you help me write a Python script to process CSV files?"
+    should_answer: false
+    expected_behavior: "Decline and redirect to retail analytics."
+    category: off_topic
+  - id: oos_004
+    question: "What is the meaning of life?"
+    should_answer: false
+    expected_behavior: "Decline philosophical questions and redirect."
+    category: philosophical
+  - id: oos_005
+    question: "Book me a meeting with the Huggies account manager for next Tuesday."
+    should_answer: false
+    expected_behavior: "Decline — cannot book meetings. Suggest exploring Huggies data instead."
+    category: action_request

@@ -1,0 +1,77 @@
+questions:
+  - id: hard_001
+    question: "Which brands are losing the most customers in Nappies & Wipes?"
+    category: hard
+    expected_sql: |
+      SELECT FROM_BRAND, TO_BRAND, SUM(SWITCH_COUNT) AS customers_switched
+      FROM BABY_MART_DEMO.ANALYTICS.VW_SUPPLIER_SWITCHING
+      WHERE CATEGORY ILIKE 'Nappies & Wipes'
+      GROUP BY FROM_BRAND, TO_BRAND
+      ORDER BY customers_switched DESC NULLS LAST
+    description: "VQR-sourced: brand switching aggregation"
+  - id: hard_002
+    question: "Show me the year-over-year growth for Nappies & Wipes by brand."
+    category: hard
+    expected_sql: |
+      SELECT BRAND_NAME, FISCAL_YEAR, SUM(REVENUE) AS total_revenue,
+             LAG(SUM(REVENUE)) OVER (PARTITION BY BRAND_NAME ORDER BY FISCAL_YEAR) AS prev_year,
+             ROUND((SUM(REVENUE) - LAG(SUM(REVENUE)) OVER (PARTITION BY BRAND_NAME ORDER BY FISCAL_YEAR))
+                   / NULLIF(LAG(SUM(REVENUE)) OVER (PARTITION BY BRAND_NAME ORDER BY FISCAL_YEAR), 0) * 100, 1) AS yoy_growth_pct
+      FROM BABY_MART_DEMO.ANALYTICS.DT_SELLTHROUGH_WEEKLY
+      WHERE CATEGORY = 'Nappies & Wipes'
+      GROUP BY BRAND_NAME, FISCAL_YEAR
+      ORDER BY BRAND_NAME, FISCAL_YEAR
+    description: "YoY growth calculation with window function"
+  - id: hard_003
+    question: "Which brand has the highest margin percentage in the Car Seats category?"
+    category: hard
+    expected_sql: |
+      SELECT BRAND_NAME, ROUND(SUM(MARGIN) / NULLIF(SUM(REVENUE), 0) * 100, 1) AS margin_pct
+      FROM BABY_MART_DEMO.ANALYTICS.DT_SELLTHROUGH_WEEKLY
+      WHERE CATEGORY = 'Car Seats'
+      GROUP BY BRAND_NAME
+      ORDER BY margin_pct DESC NULLS LAST
+      LIMIT 1
+    description: "Derived metric with ranking"
+  - id: hard_004
+    question: "Which customer segment spends the most on Prams & Strollers?"
+    category: hard
+    expected_sql: |
+      SELECT SEGMENT_NAME, SUM(REVENUE) AS total_spend
+      FROM BABY_MART_DEMO.ANALYTICS.DT_CUSTOMER_SEGMENT_PERFORMANCE
+      WHERE CATEGORY = 'Prams & Strollers'
+      GROUP BY SEGMENT_NAME
+      ORDER BY total_spend DESC NULLS LAST
+      LIMIT 1
+    description: "Cross-table segment analysis"
+  - id: hard_005
+    question: "Compare competitive pricing for Car Seats brands at Coles versus Woolworths in fiscal year 2025."
+    category: hard
+    expected_sql: |
+      SELECT BRAND_NAME, COMPETITOR_NAME, AVG(COMPETITOR_PRICE) AS avg_price
+      FROM BABY_MART_DEMO.ANALYTICS.DT_COMPETITIVE_POSITION
+      WHERE CATEGORY = 'Car Seats' AND COMPETITOR_NAME IN ('Coles', 'Woolworths') AND FISCAL_YEAR = 2025
+      GROUP BY BRAND_NAME, COMPETITOR_NAME
+      ORDER BY BRAND_NAME, COMPETITOR_NAME
+    description: "Multi-filter competitor comparison"
+  - id: hard_006
+    question: "Which brand are customers switching to most in the Car Seats category?"
+    category: hard
+    expected_sql: |
+      SELECT TO_BRAND, SUM(SWITCH_COUNT) AS total_switches_in
+      FROM BABY_MART_DEMO.ANALYTICS.DT_BRAND_SWITCHING
+      WHERE CATEGORY = 'Car Seats'
+      GROUP BY TO_BRAND
+      ORDER BY total_switches_in DESC NULLS LAST
+      LIMIT 1
+    description: "Brand switching incoming aggregation"
+  - id: hard_007
+    question: "What promotion mechanics are used for Bugaboo in the Prams & Strollers category?"
+    category: hard
+    expected_sql: |
+      SELECT MECHANIC, COUNT(*) AS promo_count, AVG(PROMO_UPLIFT_PCT) AS avg_uplift
+      FROM BABY_MART_DEMO.ANALYTICS.DT_PROMOTIONAL_EFFECTIVENESS
+      WHERE BRAND_NAME = 'Bugaboo' AND CATEGORY = 'Prams & Strollers'
+      GROUP BY MECHANIC
+      ORDER BY promo_count DESC
+    description: "Promo mechanics with effectiveness"

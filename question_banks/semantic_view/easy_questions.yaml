@@ -1,0 +1,52 @@
+questions:
+  - id: easy_001
+    question: "What is the total revenue for the Prams & Strollers category in fiscal year 2025?"
+    category: easy
+    expected_sql: |
+      SELECT SUM(REVENUE) AS total_revenue
+      FROM BABY_MART_DEMO.ANALYTICS.DT_SELLTHROUGH_WEEKLY
+      WHERE CATEGORY = 'Prams & Strollers' AND FISCAL_YEAR = 2025
+    description: "Single-table filtered aggregation"
+  - id: easy_002
+    question: "How many stores sell Clothing products in Victoria?"
+    category: easy
+    expected_sql: |
+      SELECT COUNT(DISTINCT STORE_NAME) AS store_count
+      FROM BABY_MART_DEMO.ANALYTICS.DT_SELLTHROUGH_WEEKLY
+      WHERE CATEGORY = 'Clothing' AND STATE = 'VIC'
+    description: "Distinct count with two filters"
+  - id: easy_003
+    question: "Which stores in QLD carry Prams & Strollers brands?"
+    category: easy
+    expected_sql: |
+      SELECT DISTINCT STORE_NAME
+      FROM BABY_MART_DEMO.ANALYTICS.DT_SELLTHROUGH_WEEKLY
+      WHERE STATE = 'QLD' AND CATEGORY = 'Prams & Strollers'
+      ORDER BY STORE_NAME
+    description: "Distinct list with state+category filter"
+  - id: easy_004
+    question: "What is the DIFOT performance for Huggies in fiscal year 2026?"
+    category: easy
+    expected_sql: |
+      SELECT FISCAL_WEEK, DIFOT_PCT, ON_TIME_PCT, IN_FULL_PCT
+      FROM BABY_MART_DEMO.ANALYTICS.DT_SUPPLIER_DIFOT
+      WHERE BRAND_NAME = 'Huggies' AND FISCAL_YEAR = 2026
+      ORDER BY FISCAL_WEEK
+    description: "Filtered lookup on supplier DIFOT"
+  - id: easy_005
+    question: "What promotion mechanics does Huggies use in the Nappies & Wipes category?"
+    category: easy
+    expected_sql: |
+      SELECT DISTINCT MECHANIC
+      FROM BABY_MART_DEMO.ANALYTICS.DT_PROMOTIONAL_EFFECTIVENESS
+      WHERE BRAND_NAME = 'Huggies' AND CATEGORY = 'Nappies & Wipes'
+    description: "Distinct values with brand+category filter"
+  - id: easy_006
+    question: "List the brands in the Feeding category that are sold in NSW stores in Metro regions."
+    category: easy
+    expected_sql: |
+      SELECT DISTINCT BRAND_NAME
+      FROM BABY_MART_DEMO.ANALYTICS.DT_SELLTHROUGH_WEEKLY
+      WHERE CATEGORY = 'Feeding' AND STATE = 'NSW' AND REGION = 'Metro'
+      ORDER BY BRAND_NAME
+    description: "Distinct brands with three-filter query"

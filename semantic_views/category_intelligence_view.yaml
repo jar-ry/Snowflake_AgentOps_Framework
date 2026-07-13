@@ -1,0 +1,127 @@
+# Semantic View: CATEGORY_INTELLIGENCE_VIEW
+# FQN: BABY_MART_DEMO.ANALYTICS.CATEGORY_INTELLIGENCE_VIEW
+# Extracted from Snowflake — edit this file then deploy via CI/CD.
+
+fqn: BABY_MART_DEMO.ANALYTICS.CATEGORY_INTELLIGENCE_VIEW
+
+tables:
+  - alias: CLV
+    source: BABY_MART_DEMO.ANALYTICS.DT_CLV_BY_BRAND
+  - alias: COMPETITIVE
+    source: BABY_MART_DEMO.ANALYTICS.DT_COMPETITIVE_POSITION
+  - alias: DIFOT
+    source: BABY_MART_DEMO.ANALYTICS.DT_SUPPLIER_DIFOT
+  - alias: PROMOTIONS
+    source: BABY_MART_DEMO.ANALYTICS.DT_PROMOTIONAL_EFFECTIVENESS
+  - alias: SEGMENTS
+    source: BABY_MART_DEMO.ANALYTICS.DT_CUSTOMER_SEGMENT_PERFORMANCE
+  - alias: SELLTHROUGH
+    source: BABY_MART_DEMO.ANALYTICS.DT_SELLTHROUGH_WEEKLY
+  - alias: SWITCHING
+    source: BABY_MART_DEMO.ANALYTICS.DT_BRAND_SWITCHING
+
+dimensions:
+  - table: CLV
+    column: BRAND_NAME
+    comment: Brand name
+  - table: CLV
+    column: CATEGORY
+    comment: Product category
+  - table: COMPETITIVE
+    column: BRAND_NAME
+    comment: Brand name
+  - table: COMPETITIVE
+    column: CATEGORY
+    comment: Product category
+  - table: COMPETITIVE
+    column: COMPETITOR_NAME
+    comment: "Competitor (Coles, Woolworths, Amazon AU, Chemist Warehouse)"
+  - table: COMPETITIVE
+    column: FISCAL_WEEK
+    comment: Fiscal week
+  - table: COMPETITIVE
+    column: FISCAL_YEAR
+    comment: Fiscal year
+  - table: DIFOT
+    column: BRAND_NAME
+    comment: Brand name
+  - table: DIFOT
+    column: CATEGORY
+    comment: Product category
+  - table: DIFOT
+    column: FISCAL_WEEK
+    comment: Fiscal week
+  - table: DIFOT
+    column: FISCAL_YEAR
+    comment: Fiscal year
+  - table: PROMOTIONS
+    column: BRAND_NAME
+    comment: Brand name
+  - table: PROMOTIONS
+    column: CATEGORY
+    comment: Product category
+  - table: PROMOTIONS
+    column: MECHANIC
+    comment: "Promotion mechanic (% Off, Bundle, GWP, BOGO, Multi-buy)"
+  - table: SEGMENTS
+    column: BRAND_NAME
+    comment: Brand name
+  - table: SEGMENTS
+    column: FISCAL_YEAR
+    comment: Fiscal year
+  - table: SEGMENTS
+    column: SEGMENT_NAME
+    comment: "Customer segment (First-time Parents, Second-time Parents, Gift Buyers, Grandparents, Expecting, Registry Shoppers)"
+  - table: SEGMENTS
+    column: SUPPLIER_NAME
+    comment: Supplier name
+  - table: SELLTHROUGH
+    column: BRAND_NAME
+    comment: Product brand name
+  - table: SELLTHROUGH
+    column: CATEGORY
+    comment: "Product category (Prams & Strollers, Car Seats, Nappies & Wipes, Clothing, Feeding)"
+  - table: SELLTHROUGH
+    column: CLASS
+    comment: Product sub-category
+  - table: SELLTHROUGH
+    column: FISCAL_WEEK
+    comment: Fiscal week number
+  - table: SELLTHROUGH
+    column: FISCAL_YEAR
+    comment: "Fiscal year (July-June)"
+  - table: SELLTHROUGH
+    column: REGION
+    comment: "Region type (Metro, Regional, CBD)"
+  - table: SELLTHROUGH
+    column: STATE
+    comment: "Australian state (VIC, NSW, QLD, SA, WA, TAS, ACT, NT)"
+  - table: SELLTHROUGH
+    column: STORE_NAME
+    comment: Store name
+  - table: SELLTHROUGH
+    column: SUPPLIER_NAME
+    comment: Supplier company name
+  - table: SWITCHING
+    column: CATEGORY
+    comment: Product category
+  - table: SWITCHING
+    column: CLASS
+    comment: Product class
+  - table: SWITCHING
+    column: FROM_BRAND
+    comment: Brand customers switched from
+  - table: SWITCHING
+    column: TO_BRAND
+    comment: Brand customers switched to
+
+verified_queries:
+  - question: "Which brands are losing the most customers in Nappies & Wipes?"
+    verified_by: Jarry Chen
+    verified_at: 1779105444
+    sql: |
+      SELECT FROM_BRAND, TO_BRAND, SUM(SWITCH_COUNT) AS customers_switched
+      FROM BABY_MART_DEMO.ANALYTICS.VW_SUPPLIER_SWITCHING
+      WHERE CATEGORY ILIKE 'Nappies & Wipes'
+      GROUP BY FROM_BRAND, TO_BRAND
+      ORDER BY customers_switched DESC NULLS LAST;

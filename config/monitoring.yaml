@@ -1,0 +1,48 @@
+# Monitoring configuration — alert thresholds, schedules, and notifications.
+
+monitoring:
+  schedules:
+    daily_usage_aggregation: "0 2 * * *"
+    daily_feedback_analysis: "15 2 * * *"
+    daily_health_checks: "0 6 * * *"
+    weekly_sv_eval: "0 4 * * 0"
+    weekly_agent_eval: "0 5 * * 0"
+    weekly_full_eval_github: "0 3 * * 1"
+
+  alerts:
+    negative_feedback_spike:
+      threshold_pct: 25
+      min_feedback_count: 5
+      severity_critical_pct: 50
+      schedule: "0 7 * * *"
+    accuracy_regression:
+      threshold_delta: -10
+      severity_critical_delta: -20
+      schedule: "0 8 * * *"
+    latency_degradation:
+      p95_threshold_ms: 30000
+      severity_critical_ms: 60000
+      schedule: "0 7 * * *"
+    cost_anomaly:
+      multiplier: 2.0
+      severity_critical_multiplier: 5.0
+      schedule: "0 7 * * *"
+    error_spike:
+      threshold_pct: 10
+      min_requests: 10
+      severity_critical_pct: 25
+      schedule: "0 7 * * *"
+    health_failure:
+      schedule: "30 6 * * *"
+
+  health_checks:
+    latency_healthy_ms: 15000
+    latency_degraded_ms: 30000
+    error_rate_healthy_pct: 5
+    error_rate_degraded_pct: 15
+    data_freshness_healthy_days: 90
+    data_freshness_degraded_days: 180
+
+  notifications:
+    enabled: false
+    email_recipients: []

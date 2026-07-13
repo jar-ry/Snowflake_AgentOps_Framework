@@ -1,0 +1,51 @@
+questions:
+  - id: agent_001
+    question: "What is the total revenue for the Prams & Strollers category in fiscal year 2025?"
+    should_answer: true
+    expected_answer_contains: ["revenue", "Prams & Strollers", "2025"]
+    category: data_query
+  - id: agent_002
+    question: "Show me the year-over-year growth for Nappies & Wipes by brand."
+    should_answer: true
+    expected_answer_contains: ["growth", "Nappies & Wipes", "brand"]
+    category: data_query
+  - id: agent_003
+    question: "Which brand has the highest margin percentage in the Car Seats category?"
+    should_answer: true
+    expected_answer_contains: ["margin", "Car Seats"]
+    category: data_query
+  - id: agent_004
+    question: "Which customer segment spends the most on Prams & Strollers?"
+    should_answer: true
+    expected_answer_contains: ["segment", "Prams & Strollers"]
+    category: data_query
+  - id: agent_005
+    question: "Compare competitive pricing for Car Seats brands at Coles versus Woolworths in fiscal year 2025."
+    should_answer: true
+    expected_answer_contains: ["Coles", "Woolworths", "Car Seats", "price"]
+    category: data_query
+  - id: agent_006
+    question: "Which brand are customers switching to most in the Car Seats category?"
+    should_answer: true
+    expected_answer_contains: ["switching", "Car Seats"]
+    category: data_query
+  - id: agent_007
+    question: "What is the DIFOT performance for Huggies in fiscal year 2026?"
+    should_answer: true
+    expected_answer_contains: ["DIFOT", "Huggies", "2026"]
+    category: data_query
+  - id: agent_008
+    question: "What promotion mechanics does Huggies use in Nappies & Wipes?"
+    should_answer: true
+    expected_answer_contains: ["promotion", "Huggies", "Nappies & Wipes"]
+    category: data_query
+  - id: agent_009
+    question: "List the brands in the Feeding category sold in NSW Metro stores."
+    should_answer: true
+    expected_answer_contains: ["Feeding", "NSW", "Metro"]
+    category: data_query
+  - id: agent_010
+    question: "Which brands are losing the most customers in Nappies & Wipes?"
+    should_answer: true
+    expected_answer_contains: ["switching", "Nappies & Wipes", "losing"]
+    category: data_query
