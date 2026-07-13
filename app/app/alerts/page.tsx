@@ -8,6 +8,7 @@ import { parseWindow } from "@/lib/window"
 import { pickEnv } from "@/lib/env"
 import { getEnvironments } from "@/lib/environments"
 import { safeIdent } from "@/lib/sql"
+import { S } from "@/lib/agentops.config"
 import { AgentFilter } from "../components/agent-filter"
 import { TimeWindow } from "../components/time-window"
 import { PageHeader } from "../components/layout/page-header"
@@ -43,7 +44,7 @@ export default async function AlertsPage({ searchParams }: Props) {
 
   try {
     const agentRows = await querySnowflake(`
-      SELECT DISTINCT target_name FROM ALERT_HISTORY WHERE target_name IS NOT NULL ORDER BY 1
+      SELECT DISTINCT target_name FROM ${S}ALERT_HISTORY WHERE target_name IS NOT NULL ORDER BY 1
     `)
     agents = agentRows.map((r: any) => r.TARGET_NAME).filter(Boolean)
 
@@ -52,7 +53,7 @@ export default async function AlertsPage({ searchParams }: Props) {
         alert_id, alert_type, severity, environment,
         target_name, message, metric_value, threshold_value,
         created_at, hours_since_created
-      FROM V_ACTIVE_ALERTS
+      FROM ${S}V_ACTIVE_ALERTS
       ${agentFilter}
       LIMIT 50
     `)
@@ -61,7 +62,7 @@ export default async function AlertsPage({ searchParams }: Props) {
       SELECT
         alert_type, severity, environment, target_name,
         message, created_at, acknowledged
-      FROM ALERT_HISTORY
+      FROM ${S}ALERT_HISTORY
       WHERE 1=1 ${agentFilterAnd}
       ORDER BY created_at DESC
       LIMIT 20
@@ -69,7 +70,7 @@ export default async function AlertsPage({ searchParams }: Props) {
 
     history = await querySnowflake(`
       SELECT TO_DATE(created_at) AS alert_date, COUNT(*) AS alert_count
-      FROM ALERT_HISTORY
+      FROM ${S}ALERT_HISTORY
       WHERE created_at >= DATEADD('day', -${win.days}, CURRENT_DATE()) ${agentFilterAnd}
       GROUP BY TO_DATE(created_at)
       ORDER BY alert_date ASC

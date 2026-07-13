@@ -106,7 +106,7 @@ jobs:
             --categories easy,hard,ambiguous \
             --git-sha "${{ github.sha }}" \
             --git-branch "$BRANCH" \
-            --output sv_eval_results.json || true
+            --output sv_eval_results.json
 
       - name: Run agent evaluation
         run: |
@@ -116,7 +116,7 @@ jobs:
             --git-sha "${{ github.sha }}" \
             --git-branch "$BRANCH" \
             --timeout 600 \
-            --output agent_eval_results.json || true
+            --output agent_eval_results.json
 
       - name: Upload results
         if: always()

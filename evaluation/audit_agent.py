@@ -506,22 +506,15 @@ def compute_deterministic_signals(eval_results: list) -> dict:
     avg_in = _avg("TOTAL_INPUT_TOKENS")
     avg_out = _avg("TOTAL_OUTPUT_TOKENS")
 
-    # Estimate credits from configured model pricing (input + output rates).
-    pricing = load_config().get("pricing", {})
-    model = load_config().get("llm", {}).get("model", "")
-    rates = pricing.get("models", {}).get(model, {})
-    in_rate = rates.get("input_credits_per_million", pricing.get("default_input_credits_per_million", 1.0))
-    out_rate = rates.get("output_credits_per_million", pricing.get("default_output_credits_per_million", 1.0))
-    est_credits = round(avg_in / 1_000_000 * in_rate + avg_out / 1_000_000 * out_rate, 4)
-
+    # Credits come from SNOWFLAKE.ACCOUNT_USAGE.CORTEX_AGENT_USAGE_HISTORY (TOKEN_CREDITS).
+    # At eval time we only have token counts; actual credits are available post-hoc.
+    # Report tokens only — no hardcoded rate conversion.
     return {
         "records": n,
         "avg_latency_ms": _avg("DURATION_MS"),
         "avg_input_tokens": avg_in,
         "avg_output_tokens": avg_out,
         "avg_llm_calls": _avg("LLM_CALL_COUNT"),
-        "est_avg_credits_per_question": est_credits,
-        "pricing_model": model,
     }
 
 
@@ -660,7 +653,6 @@ def run_agent_audit(
         if signals.get("records"):
             checks = [
                 ("avg_latency_ms", "max_avg_latency_ms"),
-                ("est_avg_credits_per_question", "max_avg_credits_per_question"),
                 ("avg_llm_calls", "max_avg_llm_calls"),
             ]
             for sig_key, lim_key in checks:
@@ -702,7 +694,7 @@ def run_agent_audit(
             print(f"\nDeterministic signals (non-judge, warn-only):")
             print(f"  avg latency:            {signals['avg_latency_ms']} ms")
             print(f"  avg LLM calls/question: {signals['avg_llm_calls']}")
-            print(f"  est credits/question:   {signals['est_avg_credits_per_question']} ({signals['pricing_model']})")
+            print(f"  avg tokens/question:    {signals['avg_input_tokens'] + signals['avg_output_tokens']}")
             for w in signal_warnings:
                 print(f"  WARN: {w}")
         if low_scores:

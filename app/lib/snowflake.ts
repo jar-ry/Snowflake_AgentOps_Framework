@@ -192,13 +192,16 @@ function baseConfig(): snowflake.ConnectionOptions {
     base.accessUrl = `https://${process.env.SNOWFLAKE_HOST}`
   }
   if (process.env.SNOWFLAKE_ROLE) base.role = process.env.SNOWFLAKE_ROLE
-  // Default the session to the framework's database/schema so the dashboard's
-  // unqualified queries resolve. Runtime env vars win; otherwise fall back to
-  // the bootstrap-populated values in agentops.config.ts.
-  const fwDatabase = process.env.SNOWFLAKE_DATABASE || FRAMEWORK_DB
-  const fwSchema = process.env.SNOWFLAKE_SCHEMA || FRAMEWORK_SCHEMA
-  if (fwDatabase) base.database = fwDatabase
-  if (fwSchema) base.schema = fwSchema
+  // In SPCS (App Runtime), do NOT set database/schema on the connection —
+  // it causes SERVICE_CONTEXT_NESTED_SCHEMA errors. Instead, queries are
+  // qualified with FQN via qualifySql(). Only set db/schema for local dev.
+  const isSpcs = fs.existsSync(SPCS_TOKEN_PATH)
+  if (!isSpcs) {
+    const fwDatabase = process.env.SNOWFLAKE_DATABASE || FRAMEWORK_DB
+    const fwSchema = process.env.SNOWFLAKE_SCHEMA || FRAMEWORK_SCHEMA
+    if (fwDatabase) base.database = fwDatabase
+    if (fwSchema) base.schema = fwSchema
+  }
   return base
 }
 
@@ -404,33 +407,58 @@ function getTomlPool(conn: TomlConnection): ReturnType<typeof snowflake.createPo
   return tomlPool
 }
 
+/**
+ * Qualify unqualified table/view references in SQL with the framework FQN.
+ * Matches FROM/JOIN followed by a bare identifier (no dots) and prepends DB.SCHEMA.
+ */
+function qualifySql(query: string, db: string, schema: string): string {
+  const prefix = `${db}.${schema}.`
+  return query.replace(
+    /\b(FROM|JOIN)\s+([A-Z_][A-Z0-9_]*)\b(?!\s*\(|\s*\.)/gi,
+    (_, keyword, table) => {
+      if (table.includes(".")) return `${keyword} ${table}`
+      return `${keyword} ${prefix}${table}`
+    },
+  )
+}
+
 function queryWithPool(
   pool: ReturnType<typeof snowflake.createPool>,
   query: string,
   authTag: string,
 ): Promise<Record<string, any>[]> {
   return pool.use(async (conn) => {
-    // Force the framework schema — the OAuth `schema` connection option is
-    // unreliable on the SPCS owner's-rights path, leaving CURRENT_SCHEMA null
-    // so unqualified object names fail to resolve. Resolve env-var override
-    // first, then the bootstrap-populated agentops.config values; if neither is
-    // set (e.g. local dev via connections.toml) skip and rely on the session default.
     const fqDb = process.env.SNOWFLAKE_DATABASE || FRAMEWORK_DB
     const fqSchemaName = process.env.SNOWFLAKE_SCHEMA || FRAMEWORK_SCHEMA
+
+    // Try USE SCHEMA first (works for local dev / password auth).
+    // If it fails (SPCS App Runtime token can't access external DBs),
+    // fall back to qualifying table names in the SQL directly.
+    let useSchemaOk = false
     if (fqDb && fqSchemaName) {
       const fqSchema = `${fqDb}.${fqSchemaName}`
-      await new Promise<void>((res, rej) =>
-        conn.execute({
-          sqlText: `USE SCHEMA ${fqSchema}`,
-          complete: (err) => (err ? rej(new Error(`USE SCHEMA failed: ${err.message}`)) : res()),
-        }),
-      )
+      try {
+        await new Promise<void>((res, rej) =>
+          conn.execute({
+            sqlText: `USE SCHEMA ${fqSchema}`,
+            complete: (err) => (err ? rej(err) : res()),
+          }),
+        )
+        useSchemaOk = true
+      } catch {
+        sfLog(`USE SCHEMA ${fqDb}.${fqSchemaName} failed; qualifying SQL inline`)
+      }
     }
+
+    const finalSql = (!useSchemaOk && fqDb && fqSchemaName)
+      ? qualifySql(query, fqDb, fqSchemaName)
+      : query
+
     const t0 = Date.now()
-    sfLog(`query start mode=${authTag} sql=${JSON.stringify(previewSql(query))}`)
+    sfLog(`query start mode=${authTag} sql=${JSON.stringify(previewSql(finalSql))}`)
     return new Promise<Record<string, any>[]>((res, rej) => {
       conn.execute({
-        sqlText: query,
+        sqlText: finalSql,
         complete: (err, stmt, rows) => {
           const ms = Date.now() - t0
           const qid =

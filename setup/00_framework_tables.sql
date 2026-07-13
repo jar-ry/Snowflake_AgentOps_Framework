@@ -885,44 +885,60 @@ CREATE OR REPLACE ALERT {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.ALERT_INTERACTION_
 CREATE OR REPLACE TASK {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.TASK_DAILY_USAGE_AGGREGATION
     WAREHOUSE = {{WAREHOUSE}}
     SCHEDULE = 'USING CRON 0 2 * * * UTC'
-    COMMENT = 'Daily aggregation of agent/analyst usage and token costs'
+    COMMENT = 'Daily aggregation of agent usage and costs from SNOWFLAKE.ACCOUNT_USAGE.CORTEX_AGENT_USAGE_HISTORY'
 AS
-    INSERT INTO {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.USAGE_METRICS (
+    MERGE INTO {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.USAGE_METRICS tgt
+    USING (
+        SELECT
+            START_TIME::DATE                                                              AS metric_date,
+            AGENT_DATABASE_NAME                                                          AS environment,
+            'cortex_agent'                                                               AS service_type,
+            AGENT_NAME                                                                   AS agent_or_sv_name,
+            COUNT(*)                                                                     AS total_requests,
+            COUNT(*)                                                                     AS successful_requests,
+            0                                                                            AS failed_requests,
+            SUM(TOKENS)                                                                  AS total_input_tokens,
+            0                                                                            AS total_output_tokens,
+            SUM(TOKENS)                                                                  AS total_tokens,
+            0                                                                            AS total_cache_read_tokens,
+            SUM(TOKEN_CREDITS)                                                           AS estimated_credits,
+            AVG(DATEDIFF('millisecond', START_TIME, END_TIME))                           AS avg_latency_ms,
+            APPROX_PERCENTILE(DATEDIFF('millisecond', START_TIME, END_TIME), 0.5)        AS p50_latency_ms,
+            APPROX_PERCENTILE(DATEDIFF('millisecond', START_TIME, END_TIME), 0.95)       AS p95_latency_ms,
+            APPROX_PERCENTILE(DATEDIFF('millisecond', START_TIME, END_TIME), 0.99)       AS p99_latency_ms,
+            COUNT(DISTINCT USER_NAME)                                                    AS unique_users
+        FROM SNOWFLAKE.ACCOUNT_USAGE.CORTEX_AGENT_USAGE_HISTORY
+        WHERE START_TIME::DATE = CURRENT_DATE() - 1
+        GROUP BY 1, 2, 3, 4
+    ) src
+    ON tgt.metric_date = src.metric_date
+       AND tgt.environment = src.environment
+       AND tgt.agent_or_sv_name = src.agent_or_sv_name
+    WHEN MATCHED THEN UPDATE SET
+        tgt.total_requests = src.total_requests,
+        tgt.successful_requests = src.successful_requests,
+        tgt.failed_requests = src.failed_requests,
+        tgt.total_input_tokens = src.total_input_tokens,
+        tgt.total_output_tokens = src.total_output_tokens,
+        tgt.total_tokens = src.total_tokens,
+        tgt.estimated_credits = src.estimated_credits,
+        tgt.avg_latency_ms = src.avg_latency_ms,
+        tgt.p50_latency_ms = src.p50_latency_ms,
+        tgt.p95_latency_ms = src.p95_latency_ms,
+        tgt.p99_latency_ms = src.p99_latency_ms,
+        tgt.unique_users = src.unique_users,
+        tgt.collected_at = CURRENT_TIMESTAMP()
+    WHEN NOT MATCHED THEN INSERT (
         metric_date, environment, service_type, agent_or_sv_name,
         total_requests, successful_requests, failed_requests,
         total_input_tokens, total_output_tokens, total_tokens, total_cache_read_tokens,
-        estimated_credits, avg_latency_ms, p50_latency_ms, p95_latency_ms, p99_latency_ms,
-        unique_users
-    )
-    SELECT
-        CURRENT_DATE() - 1                                                           AS metric_date,
-        COALESCE(database_name, 'UNKNOWN')                                           AS environment,
-        CASE
-            WHEN span_name LIKE 'ReasoningAgentStep%' OR span_name LIKE 'CodingAgent%' THEN 'cortex_agent'
-            WHEN span_name ILIKE '%Analyst%' OR span_name ILIKE '%SqlExecution%' THEN 'cortex_analyst'
-            ELSE 'other'
-        END                                                                          AS service_type,
-        COALESCE(agent_name, 'unknown')                                              AS agent_or_sv_name,
-        COUNT(DISTINCT trace_id)                                                     AS total_requests,
-        COUNT_IF(status_code = 'STATUS_CODE_OK')                                     AS successful_requests,
-        COUNT_IF(status_code != 'STATUS_CODE_OK')                                    AS failed_requests,
-        COALESCE(SUM(input_tokens), 0)                                               AS total_input_tokens,
-        COALESCE(SUM(output_tokens), 0)                                              AS total_output_tokens,
-        COALESCE(SUM(total_tokens), 0)                                               AS total_tokens,
-        COALESCE(SUM(cache_read_tokens), 0)                                          AS total_cache_read_tokens,
-        SUM(COALESCE(total_tokens, 0)) / 1000000.0 * 1.0                             AS estimated_credits,
-        AVG(planning_duration_ms)                                                    AS avg_latency_ms,
-        APPROX_PERCENTILE(planning_duration_ms, 0.5)                                 AS p50_latency_ms,
-        APPROX_PERCENTILE(planning_duration_ms, 0.95)                                AS p95_latency_ms,
-        APPROX_PERCENTILE(planning_duration_ms, 0.99)                                AS p99_latency_ms,
-        0                                                                            AS unique_users
-    FROM {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.AGENT_TRACES
-    WHERE event_time >= DATEADD('day', -1, CURRENT_DATE())
-      AND event_time < CURRENT_DATE()
-      AND (span_name LIKE 'ReasoningAgentStepPlanning%'
-           OR span_name LIKE 'CodingAgent.Step%'
-           OR span_name ILIKE '%Analyst%')
-    GROUP BY 1, 2, 3, 4;
+        estimated_credits, avg_latency_ms, p50_latency_ms, p95_latency_ms, p99_latency_ms, unique_users
+    ) VALUES (
+        src.metric_date, src.environment, src.service_type, src.agent_or_sv_name,
+        src.total_requests, src.successful_requests, src.failed_requests,
+        src.total_input_tokens, src.total_output_tokens, src.total_tokens, src.total_cache_read_tokens,
+        src.estimated_credits, src.avg_latency_ms, src.p50_latency_ms, src.p95_latency_ms, src.p99_latency_ms, src.unique_users
+    );
 
 -- Task: Daily feedback sentiment analysis + rollup
 CREATE OR REPLACE TASK {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.TASK_DAILY_FEEDBACK_ANALYSIS
