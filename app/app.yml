@@ -9,8 +9,3 @@ install:
 
 run:
   command: ["node", ".next/standalone/server.js"]
-  env:
-    SNOWFLAKE_DATABASE: BABY_MART_DEMO
-    SNOWFLAKE_SCHEMA: AGENTOPS
-    SNOWFLAKE_WAREHOUSE: RETAIL_AI_EVAL_WH
-    SNOWFLAKE_ROLE: ACCOUNTADMIN

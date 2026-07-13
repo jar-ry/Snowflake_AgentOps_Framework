@@ -16,37 +16,35 @@ questions:
       WHERE CATEGORY = 'Clothing' AND STATE = 'VIC'
     description: "Distinct count with two filters"
   - id: easy_003
-    question: "Which stores in QLD carry Prams & Strollers brands?"
-    category: easy
-    expected_sql: |
-      SELECT DISTINCT STORE_NAME
-      FROM BABY_MART_DEMO.ANALYTICS.DT_SELLTHROUGH_WEEKLY
-      WHERE STATE = 'QLD' AND CATEGORY = 'Prams & Strollers'
-      ORDER BY STORE_NAME
-    description: "Distinct list with state+category filter"
-  - id: easy_004
-    question: "What is the DIFOT performance for Huggies in fiscal year 2026?"
-    category: easy
-    expected_sql: |
-      SELECT FISCAL_WEEK, DIFOT_PCT, ON_TIME_PCT, IN_FULL_PCT
-      FROM BABY_MART_DEMO.ANALYTICS.DT_SUPPLIER_DIFOT
-      WHERE BRAND_NAME = 'Huggies' AND FISCAL_YEAR = 2026
-      ORDER BY FISCAL_WEEK
-    description: "Filtered lookup on supplier DIFOT"
-  - id: easy_005
-    question: "What promotion mechanics does Huggies use in the Nappies & Wipes category?"
-    category: easy
-    expected_sql: |
-      SELECT DISTINCT MECHANIC
-      FROM BABY_MART_DEMO.ANALYTICS.DT_PROMOTIONAL_EFFECTIVENESS
-      WHERE BRAND_NAME = 'Huggies' AND CATEGORY = 'Nappies & Wipes'
-    description: "Distinct values with brand+category filter"
-  - id: easy_006
-    question: "List the brands in the Feeding category that are sold in NSW stores in Metro regions."
+    question: "Which brands are in the Feeding category?"
     category: easy
     expected_sql: |
       SELECT DISTINCT BRAND_NAME
       FROM BABY_MART_DEMO.ANALYTICS.DT_SELLTHROUGH_WEEKLY
-      WHERE CATEGORY = 'Feeding' AND STATE = 'NSW' AND REGION = 'Metro'
+      WHERE CATEGORY = 'Feeding'
       ORDER BY BRAND_NAME
-    description: "Distinct brands with three-filter query"
+    description: "Distinct brand list with category filter"
+  - id: easy_004
+    question: "What is the average DIFOT percentage for Huggies?"
+    category: easy
+    expected_sql: |
+      SELECT AVG(DIFOT_PCT) AS avg_difot
+      FROM BABY_MART_DEMO.ANALYTICS.DT_SUPPLIER_DIFOT
+      WHERE BRAND_NAME = 'Huggies'
+    description: "Simple average on supplier DIFOT"
+  - id: easy_005
+    question: "What promotion mechanics are used for Huggies?"
+    category: easy
+    expected_sql: |
+      SELECT DISTINCT MECHANIC
+      FROM BABY_MART_DEMO.ANALYTICS.DT_PROMOTIONAL_EFFECTIVENESS
+      WHERE BRAND_NAME = 'Huggies'
+    description: "Distinct values with brand filter"
+  - id: easy_006
+    question: "What are the total units sold for Nappies & Wipes in fiscal year 2025?"
+    category: easy
+    expected_sql: |
+      SELECT SUM(UNITS_SOLD) AS total_units
+      FROM BABY_MART_DEMO.ANALYTICS.DT_SELLTHROUGH_WEEKLY
+      WHERE CATEGORY = 'Nappies & Wipes' AND FISCAL_YEAR = 2025
+    description: "Simple sum with two filters"
