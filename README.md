@@ -46,6 +46,8 @@ flowchart TB
 
 ## Getting started
 
+**Start with the `bootstrap-from-existing` skill (recommended)** — it discovers your objects, writes `config/environments.yaml`, and runs the installer for you. Prefer to do it by hand? Follow the equivalent [Manual setup](#manual-setup) steps instead. Both produce the same result; you do **not** need to do both. The one hard requirement is that `config/environments.yaml` must exist before `setup/install.py` runs — bootstrap creates it; manual setup copies it from the template.
+
 ### Prerequisites
 
 - Python 3.11+
@@ -76,8 +78,8 @@ The skill will:
 2. Let you select which to bring under governance
 3. Ask for a database + schema to store framework tables
 4. Generate `config/environments.yaml`
-5. Execute the setup SQL to create framework objects
-6. Seed starter question banks from your semantic view structure
+5. Ask which capability modules to install and run `setup/install.py --modules <selected>` to create them (dependencies resolved automatically)
+6. Seed starter question banks from your semantic view structure (if the evaluation module is selected)
 
 ### Manual setup
 
@@ -95,7 +97,15 @@ cp config/monitoring.yaml.template config/monitoring.yaml
 
 3. Edit `config/environments.yaml` — fill in your semantic view FQNs, agent FQNs, and framework DB/schema.
 
-4. Create the framework objects. `setup/00_framework_tables.sql` contains three placeholders — `{{FRAMEWORK_DB}}`, `{{FRAMEWORK_SCHEMA}}`, and `{{WAREHOUSE}}`. Substitute your values and run the script against your account (via a Snowsight worksheet, `snow sql`, or the Python connector). The bootstrap skill above performs this substitution and execution for you.
+4. Create the framework objects with the modular installer. Choose which capability modules to deploy (dependencies are resolved automatically):
+
+   ```bash
+   python setup/install.py --list                          # see the six modules
+   python setup/install.py --modules monitoring,dashboard  # e.g. dashboard + data, no CI/CD
+   python setup/install.py --modules all                   # the full framework
+   ```
+
+   The installer reads `modules.yaml` + `config/environments.yaml`, substitutes `{{FRAMEWORK_DB}}` / `{{FRAMEWORK_SCHEMA}}` / `{{WAREHOUSE}}`, and executes each selected module's SQL. See [docs/how-to/choose-modules.md](docs/how-to/choose-modules.md). The bootstrap and `/agentops-configure` skills drive this for you.
 
 5. Create question banks in `question_banks/` and run your first evaluation.
 
@@ -140,7 +150,7 @@ This is the inverse of `setup/deploy.py` — it captures the live definition int
 
 ## Monitoring & observability
 
-The framework creates tables, views, alerts, and tasks in your chosen schema (see `setup/00_framework_tables.sql`). Three daily tasks aggregate usage, feedback, and interaction-quality data, and seven Snowflake Alerts fire on regressions — feedback spikes, accuracy drops, latency degradation, cost anomalies, error spikes, health failures, and interaction-quality issues. See [Pillar 3: Runtime monitoring](docs/explanation/pillar-3-runtime-monitoring.md) for the full task schedule, alert thresholds, and severity logic.
+The framework creates tables, views, alerts, and tasks in your chosen schema, grouped into selectable modules (see `modules.yaml` and [docs/how-to/choose-modules.md](docs/how-to/choose-modules.md)). When the `automation` and `alerts` modules are installed, three daily tasks aggregate usage, feedback, and interaction-quality data, and seven Snowflake Alerts fire on regressions — feedback spikes, accuracy drops, latency degradation, cost anomalies, error spikes, health failures, and interaction-quality issues. See [Pillar 3: Runtime monitoring](docs/explanation/pillar-3-runtime-monitoring.md) for the full task schedule, alert thresholds, and severity logic.
 
 ### Monitoring dashboard (App Runtime)
 

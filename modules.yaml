@@ -1,0 +1,129 @@
+# ============================================================================
+# modules.yaml - AgentOps framework module manifest
+#
+# Single source of truth for what the framework installs. Each capability is a
+# selectable module. setup/install.py reads this file to resolve dependencies,
+# order SQL execution, and drive selective install / uninstall.
+#
+#   python setup/install.py --modules monitoring,dashboard
+#   python setup/install.py --modules all --dry-run
+#   python setup/install.py --uninstall --modules alerts
+#
+# SQL entries run in listed order. An entry may be a bare path string, or a
+# mapping {path, requires: [<module>...]} that install.py applies only when the
+# required module(s) are also part of the selected set.
+#
+# `drops` list the objects a module owns, already in safe teardown order
+# (dependents first). install.py uses them for --uninstall.
+# ============================================================================
+
+modules:
+
+  core:
+    title: Core
+    description: Framework schema + observability views over ACCOUNT_USAGE / ai_observability_events. Foundation for every other module.
+    required: true
+    depends_on: []
+    sql:
+      - modules/core/sql/010_schema.sql
+      - modules/core/sql/020_observability_views.sql
+    drops:
+      - {type: VIEW, name: AGENT_REQUEST_SUMMARY}
+      - {type: VIEW, name: ANALYST_QUERIES}
+      - {type: VIEW, name: LLM_CALLS}
+      - {type: VIEW, name: AGENT_TRACES}
+
+  evaluation:
+    title: Evaluation & CI/CD
+    description: Semantic-view / agent evaluation result tables + accuracy trend view. Paired with evaluation/*.py, question_banks/, and the CI workflows (the "devops" layer).
+    depends_on: [core]
+    assets:
+      - evaluation/
+      - question_banks/
+      - .github/workflows/
+      - ci/
+    sql:
+      - modules/evaluation/sql/010_eval_tables.sql
+      - modules/evaluation/sql/020_eval_views.sql
+    drops:
+      - {type: VIEW, name: V_EVAL_ACCURACY_TREND}
+      - {type: TABLE, name: SEMANTIC_VIEW_EVAL_DETAILS}
+      - {type: TABLE, name: SEMANTIC_VIEW_EVAL_RUNS}
+      - {type: TABLE, name: SCHEDULED_EVAL_RUNS}
+
+  monitoring:
+    title: Runtime monitoring
+    description: Monitoring tables (usage/cost, feedback, health, alert history, interaction quality) plus all trend, quality, and dashboard views.
+    depends_on: [core]
+    sql:
+      - modules/monitoring/sql/010_monitoring_tables.sql
+      - modules/monitoring/sql/020_monitoring_views.sql
+      - modules/monitoring/sql/030_quality_engine.sql
+    drops:
+      - {type: VIEW, name: V_INTERACTION_QUALITY_DASHBOARD}
+      - {type: VIEW, name: V_INTERACTION_QUALITY_FLAGS}
+      - {type: VIEW, name: V_THREAD_QUALITY_SIGNALS}
+      - {type: VIEW, name: V_REQUEST_QUALITY_SIGNALS}
+      - {type: VIEW, name: V_WEEKLY_EXECUTIVE_SUMMARY}
+      - {type: VIEW, name: V_ACTIVE_ALERTS}
+      - {type: VIEW, name: V_HEALTH_DASHBOARD}
+      - {type: VIEW, name: V_AGENT_USAGE_PATTERNS}
+      - {type: VIEW, name: V_BUDGET_BURN}
+      - {type: VIEW, name: V_AGENT_USAGE_SOURCE}
+      - {type: VIEW, name: V_TOKEN_COST_TREND}
+      - {type: VIEW, name: V_FEEDBACK_TREND}
+      - {type: TABLE, name: INTERACTION_QUALITY_DAILY}
+      - {type: TABLE, name: FEEDBACK_DAILY_SUMMARY}
+      - {type: TABLE, name: ALERT_HISTORY}
+      - {type: TABLE, name: HEALTH_CHECK_RESULTS}
+      - {type: TABLE, name: AI_USAGE_BUDGETS}
+      - {type: TABLE, name: USAGE_METRICS_BY_MODEL}
+      - {type: TABLE, name: USAGE_METRICS_BY_USER}
+      - {type: TABLE, name: USAGE_METRICS}
+      - {type: TABLE, name: USER_FEEDBACK}
+
+  alerts:
+    title: Alerts
+    description: Snowflake Alerts that fire on regressions (feedback, latency, cost, errors, health, interaction quality). The accuracy-regression alert is applied only when evaluation is also selected.
+    depends_on: [monitoring]
+    requires_warehouse: true
+    sql:
+      - modules/alerts/sql/010_alerts.sql
+      - {path: modules/alerts/sql/020_alert_accuracy_regression.sql, requires: [evaluation]}
+    drops:
+      - {type: ALERT, name: ALERT_ACCURACY_REGRESSION}
+      - {type: ALERT, name: ALERT_INTERACTION_QUALITY}
+      - {type: ALERT, name: ALERT_HEALTH_FAILURE}
+      - {type: ALERT, name: ALERT_ERROR_SPIKE}
+      - {type: ALERT, name: ALERT_COST_ANOMALY}
+      - {type: ALERT, name: ALERT_LATENCY_DEGRADATION}
+      - {type: ALERT, name: ALERT_NEGATIVE_FEEDBACK_SPIKE}
+
+  automation:
+    title: Automation (tasks)
+    description: Scheduled tasks that populate the monitoring tables daily (usage aggregation, feedback rollup, interaction-quality scan).
+    depends_on: [monitoring]
+    requires_warehouse: true
+    sql:
+      - modules/automation/sql/010_tasks.sql
+    drops:
+      - {type: TASK, name: TASK_DAILY_INTERACTION_QUALITY}
+      - {type: TASK, name: TASK_DAILY_FEEDBACK_ANALYSIS}
+      - {type: TASK, name: TASK_DAILY_USAGE_AGGREGATION}
+
+  dashboard:
+    title: Monitoring dashboard
+    description: Next.js App Runtime dashboard in app/. Reads the monitoring (and, when present, evaluation) views. Individual pages are toggleable via app/lib/agentops.config.ts.
+    depends_on: [monitoring]
+    app_dir: app/
+    # Pages that can be independently enabled/disabled (written to ENABLED_PAGES
+    # in app/lib/agentops.config.ts). "overview" is the landing page.
+    pages:
+      - {key: overview, title: Overview, requires_modules: [monitoring]}
+      - {key: accuracy, title: Accuracy, requires_modules: [evaluation]}
+      - {key: quality,  title: Quality,  requires_modules: [monitoring]}
+      - {key: cost,     title: Cost,     requires_modules: [monitoring]}
+      - {key: feedback, title: Feedback, requires_modules: [monitoring]}
+      - {key: alerts,   title: Alerts,   requires_modules: [alerts]}
+    sql: []
+    drops: []

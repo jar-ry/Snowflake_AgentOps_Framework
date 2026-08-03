@@ -1,6 +1,10 @@
 -- ============================================================================
 -- 99_teardown.sql
--- Removes ALL framework objects created by 00_framework_tables.sql.
+-- Removes ALL framework objects (full wipe). For module-aware teardown prefer:
+--     python setup/install.py --uninstall --modules <module>
+--     python setup/install.py --uninstall --modules all --cascade
+-- This script remains as a convenient drop-everything fallback.
+--
 -- Run this to completely undo the bootstrap.
 --
 -- Order: Tasks → Alerts → Views → Tables → (optionally) Schema

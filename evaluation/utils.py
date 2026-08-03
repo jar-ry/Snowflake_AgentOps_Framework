@@ -112,7 +112,7 @@ def _resolve_connection_params(connection_name: str) -> dict:
     return config.get(connection_name, {})
 
 
-def get_connection(environment: str = "dev") -> snowflake.connector.SnowflakeConnection:
+def get_connection(environment: str = "dev", set_context: bool = True) -> snowflake.connector.SnowflakeConnection:
     config = load_config()
     env_config = config["environments"][environment]
 
@@ -162,14 +162,17 @@ def get_connection(environment: str = "dev") -> snowflake.connector.SnowflakeCon
             conn = snowflake.connector.connect(connection_name=conn_name)
             conn.cursor().execute(f"USE WAREHOUSE {warehouse}")
 
-    # Set context: for new format use framework DB; for old format use env DB
-    if _is_new_config_format(config):
-        fw = config.get("framework", {})
-        conn.cursor().execute(f"USE DATABASE {fw['database']}")
-        conn.cursor().execute(f"USE SCHEMA {fw['schema']}")
-    else:
-        conn.cursor().execute(f"USE DATABASE {env_config['database']}")
-        conn.cursor().execute(f"USE SCHEMA {env_config.get('semantic_schema', env_config['schema'])}")
+    # Set context: for new format use framework DB; for old format use env DB.
+    # set_context=False is used by the modular installer, which runs fully
+    # qualified DDL and must connect before the framework schema exists.
+    if set_context:
+        if _is_new_config_format(config):
+            fw = config.get("framework", {})
+            conn.cursor().execute(f"USE DATABASE {fw['database']}")
+            conn.cursor().execute(f"USE SCHEMA {fw['schema']}")
+        else:
+            conn.cursor().execute(f"USE DATABASE {env_config['database']}")
+            conn.cursor().execute(f"USE SCHEMA {env_config.get('semantic_schema', env_config['schema'])}")
     return conn
 
 

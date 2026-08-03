@@ -8,10 +8,11 @@ import { parseWindow } from "@/lib/window"
 import { pickEnv } from "@/lib/env"
 import { getEnvironments } from "@/lib/environments"
 import { safeIdent } from "@/lib/sql"
-import { S } from "@/lib/agentops.config"
+import { S, isPageEnabled } from "@/lib/agentops.config"
 import { AgentFilter } from "../components/agent-filter"
 import { TimeWindow } from "../components/time-window"
 import { PageHeader } from "../components/layout/page-header"
+import { ModuleNotEnabled } from "../components/layout/module-not-enabled"
 import { KpiCard } from "../components/cards/kpi-card"
 import { LineChartCard, StackedBarChartCard, type LineSeries } from "../components/cards/chart-cards"
 import { DataTableCard } from "../components/cards/data-table-card"
@@ -27,6 +28,7 @@ interface Props {
 }
 
 export default async function QualityPage({ searchParams }: Props) {
+  if (!isPageEnabled("quality")) return <ModuleNotEnabled title="Quality" module="monitoring" />
   const { agent: agentRaw, window, env } = await searchParams
   const agent = safeIdent(agentRaw)
   const win = parseWindow(window)

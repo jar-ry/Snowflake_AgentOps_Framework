@@ -6,6 +6,8 @@ This is a governance framework for **Semantic Views** and **Cortex Agents** in S
 
 The repo contains the **framework only**. Users point it at their existing objects via `config/environments.yaml`.
 
+**Entry point:** setup starts with the `bootstrap-from-existing` skill (`.cortex/skills/bootstrap-from-existing/`). It discovers the user's semantic views/agents, writes `config/environments.yaml`, asks which capability modules to install, and runs `setup/install.py --modules <selected>` to create the framework objects. Manual setup (copy the config template, then run `install.py`) is the equivalent alternative. Either way, `config/environments.yaml` must exist before `setup/install.py` runs. To add/remove modules or toggle dashboard pages later, use the `agentops-configure` skill. See [docs/how-to/choose-modules.md](docs/how-to/choose-modules.md).
+
 ## Conventions
 
 - Always ask the user when unsure or when design decisions are needed
@@ -19,6 +21,8 @@ The repo contains the **framework only**. Users point it at their existing objec
 ## Snowflake environment
 
 The framework creates its tables, views, alerts, and tasks in a **single user-provided schema** (`{{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}`, configured in `config/environments.yaml`). It does NOT create databases, warehouses, or RBAC roles.
+
+Objects are grouped into six selectable **modules** (`modules.yaml`): `core` (always), `evaluation`, `monitoring`, `alerts`, `automation`, `dashboard`. `setup/install.py --modules <list>` resolves dependencies and installs only what's chosen, so a customer can take, e.g., monitoring + dashboard without the evaluation/CI ("devops") layer. See [docs/how-to/choose-modules.md](docs/how-to/choose-modules.md).
 
 ### What the framework creates (in the framework schema)
 
@@ -59,9 +63,18 @@ Snowflake_AgentOps_Framework/
 │   ├── adversarial_library.yaml       # Adversarial patterns
 │   └── utils.py                       # Config loader + SF helpers
 ├── question_banks/                     # User's question banks
+├── modules.yaml                        # Module manifest (what install.py deploys)
+├── modules/                            # Framework SQL, split by capability module
+│   ├── core/sql/                       #   schema + observability views (always)
+│   ├── evaluation/sql/                 #   eval tables + accuracy view
+│   ├── monitoring/sql/                 #   monitoring tables + trend/quality views
+│   ├── alerts/sql/                     #   Snowflake alerts
+│   └── automation/sql/                 #   scheduled tasks
 ├── setup/
-│   ├── 00_framework_tables.sql        # All framework SQL objects
-│   └── deploy.py                      # Deploy helper (CI)
+│   ├── install.py                     # Modular installer (reads modules.yaml)
+│   ├── 00_framework_tables.sql        # Deprecated pointer -> modules/
+│   ├── 99_teardown.sql                # Full-wipe fallback
+│   └── deploy.py                      # SV/agent deploy helper (CI)
 ├── docs/                              # Reference & explanation
 └── README.md
 ```

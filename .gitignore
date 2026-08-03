@@ -26,5 +26,8 @@ monitoring/output/
 # SiS descriptor rendered from snowflake.yml.template (gitignored; template is tracked)
 monitoring/snowflake.yml
 
+# Modular installer state (which modules are installed) — instance-specific
+.agentops-installed.yaml
+
 # Local-only demo sandbox (mock-data fork of the dashboard, version backups, seed)
 demo/

@@ -165,14 +165,28 @@ Use the Write tool for both. Do not modify the values — just materialize the f
 
 #### Also point the monitoring dashboard at the framework schema
 
-The React (App Runtime) dashboard in `app/` queries the framework's monitoring objects by **unqualified** name, so the deployed app must default its Snowflake session to the framework database/schema. There is no env-injection mechanism in App Runtime, so the app reads these from a small config module. Write `app/lib/agentops.config.ts` with the chosen framework location:
+(Only if the **dashboard** module will be selected in Step 5.) The React (App
+Runtime) dashboard in `app/` queries the framework's monitoring objects by name,
+so the deployed app must know the framework database/schema. Write
+`app/lib/agentops.config.ts` with the chosen framework location AND the pages to
+expose:
 
 ```ts
 export const FRAMEWORK_DB = "<chosen_database>"
 export const FRAMEWORK_SCHEMA = "<chosen_schema>"
+// ... (keep the S and isPageEnabled helpers already in the file) ...
+export const ENABLED_PAGES: PageKey[] = ["overview", "accuracy", "quality", "cost", "feedback", "alerts"]
 ```
 
-Use the same `<chosen_database>` and `<chosen_schema>` selected in Step 3 (they must match `framework.database` / `framework.schema` in `config/environments.yaml`). Without this, the deployed dashboard fails every query with `Object '...' does not exist or not authorized`.
+Use the same `<chosen_database>` / `<chosen_schema>` from Step 3 (they must match
+`framework.database` / `framework.schema` in `config/environments.yaml`).
+
+Set `ENABLED_PAGES` to only the pages whose backing modules are installed:
+`accuracy` needs **evaluation**; `alerts` needs the **alerts** module; the rest
+need **monitoring**. Drop any page whose module the customer did not select -
+disabled pages vanish from the nav and render a "module not installed" notice if
+opened directly. Without `FRAMEWORK_DB` / `FRAMEWORK_SCHEMA` the deployed
+dashboard fails every query with `Object '...' does not exist or not authorized`.
 
 #### Also extract and version-control object definitions (YAML)
 
@@ -191,18 +205,48 @@ Write the **pure spec YAML** (no SQL wrapper) to `agents/<short_name_lowercase>.
 
 These `.yaml` files are the editable, diff-able definitions. When a developer changes the semantic view or agent (in Snowsight or directly in the file), they commit the updated `.yaml` and the CI pipeline evaluates it before deployment.
 
-### Step 5: Create Framework Tables
+### Step 5: Choose Modules & Create Framework Objects
 
-Read `setup/00_framework_tables.sql` and perform token substitution:
-- `{{FRAMEWORK_DB}}` → the chosen database
-- `{{FRAMEWORK_SCHEMA}}` → the chosen schema
-- `{{WAREHOUSE}}` → the chosen warehouse
+The framework is split into six selectable capability modules (declared in
+`modules.yaml`) so a customer can deploy only what they need. Before creating
+objects, ask which modules to install.
 
-Split the file on `;` to get individual statements. Execute each non-empty statement via `snowflake_sql_execute`.
+Use `ask_user_question` (type: options, `multiSelect: true`), titled "Modules".
+Offer the five optional modules (`core` is always installed):
 
-Skip any statement that is only whitespace or comments.
+- **Evaluation & CI/CD** - eval tables + accuracy view; pairs with the eval scripts and CI workflows (the "devops" layer).
+- **Runtime monitoring** - monitoring tables + trend/quality/dashboard views. Foundation for alerts, automation, dashboard.
+- **Alerts** - Snowflake alerts on regressions (needs monitoring + warehouse).
+- **Automation** - scheduled aggregation tasks (needs monitoring + warehouse).
+- **Dashboard** - Next.js App Runtime monitoring app (needs monitoring).
+
+Pre-select all five (a full install reproduces the classic framework).
+Dependencies are auto-included by the installer, so passing the top-level
+choices is enough. Then run the installer (preview, then apply):
+
+```bash
+python setup/install.py --modules <selected> --dry-run
+python setup/install.py --modules <selected>
+```
+
+`install.py` reads `modules.yaml` + `config/environments.yaml`, performs the
+`{{FRAMEWORK_DB}}` / `{{FRAMEWORK_SCHEMA}}` / `{{WAREHOUSE}}` substitution,
+executes each module's SQL through the Snowflake connector (which keeps
+multi-statement task bodies intact), and records the installed set in
+`.agentops-installed.yaml`. Do NOT hand-split SQL or run DDL yourself.
+
+Note the downstream steps below are CONDITIONAL on the modules chosen:
+- Step 6 (question banks) applies only if **evaluation** was selected.
+- Step 7 (CI authentication grants) applies only if **evaluation** was selected.
+- The dashboard config write (Step 4 sub-section) and page toggles apply only
+  if **dashboard** was selected.
+- **automation** tasks are created SUSPENDED - remind the user to
+  `ALTER TASK ... RESUME` them (or resume in Snowsight) to start collection.
 
 ### Step 6: Seed Question Banks
+
+(Only if the **evaluation** module was selected in Step 5 - question banks feed
+the eval scripts. Skip this step entirely otherwise.)
 
 Before reporting, check for existing evaluation data that can seed the question banks. This avoids starting from scratch when the user already has verified queries or eval datasets.
 
@@ -338,6 +382,9 @@ If NO existing evaluation data was found, tell the user:
 - Then suggest: `python evaluation/generate_question_bank.py --semantic-view-yaml <path>` to generate questions from the semantic view structure using an LLM.
 
 ### Step 7: CI Authentication (use the operator's own user — do NOT create a user)
+
+(Only if the **evaluation** module was selected in Step 5 - these grants exist
+for the CI/CD eval jobs. Skip if the customer is not using the devops layer.)
 
 CI/CD authenticates to Snowflake as an **existing user — the operator's own Snowflake login** (or another human/role they already have). This skill does **NOT** create a CI or service user, and does **NOT** create or alter any network policy. The operator provides credentials for a user that already exists.
 

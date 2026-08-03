@@ -12,7 +12,7 @@ CI evaluation has a fundamental limitation: it tests a curated, finite set of qu
 
 ## Data source: `snowflake.local.ai_observability_events`
 
-Snowflake captures every Cortex Agent and Analyst interaction in a built-in observability view. The framework creates convenience views on top of it (all in `setup/00_framework_tables.sql`):
+Snowflake captures every Cortex Agent and Analyst interaction in a built-in observability view. The framework creates convenience views on top of it (in `modules/core/sql/020_observability_views.sql`):
 
 | View | What it shows |
 |------|--------------|
