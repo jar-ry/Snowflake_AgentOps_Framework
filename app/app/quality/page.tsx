@@ -19,7 +19,6 @@ import { DataTableCard } from "../components/cards/data-table-card"
 import { FlaggedInteractionsTable, type FlaggedRow } from "../components/flagged-interactions-table"
 import { SeverityLegend } from "../components/severity-legend"
 import { CheckCircleIcon } from "@phosphor-icons/react/dist/ssr/CheckCircle"
-import { SmileyIcon } from "@phosphor-icons/react/dist/ssr/Smiley"
 
 export const dynamic = "force-dynamic"
 
@@ -135,7 +134,6 @@ export default async function QualityPage({ searchParams }: Props) {
     llmKpis = await querySnowflake(`
       SELECT
         ROUND(SUM(COALESCE(llm_resolved_count, 0)) * 100.0 / NULLIF(SUM(COALESCE(llm_total_scored, 0)), 0), 1) AS resolution_rate,
-        ROUND(SUM(COALESCE(llm_positive_count, 0)) * 100.0 / NULLIF(SUM(COALESCE(llm_total_scored, 0)), 0), 1) AS positive_experience_rate,
         COALESCE(SUM(llm_total_scored), 0) AS total_scored
       FROM ${S}FEEDBACK_DAILY_SUMMARY
       ${sentWhere}
@@ -144,8 +142,7 @@ export default async function QualityPage({ searchParams }: Props) {
     llmTrend = await querySnowflake(`
       SELECT
         summary_date,
-        ROUND(SUM(COALESCE(llm_resolved_count, 0)) * 100.0 / NULLIF(SUM(COALESCE(llm_total_scored, 0)), 0), 1) AS resolution_rate,
-        ROUND(SUM(COALESCE(llm_positive_count, 0)) * 100.0 / NULLIF(SUM(COALESCE(llm_total_scored, 0)), 0), 1) AS positive_experience
+        ROUND(SUM(COALESCE(llm_resolved_count, 0)) * 100.0 / NULLIF(SUM(COALESCE(llm_total_scored, 0)), 0), 1) AS resolution_rate
       FROM ${S}FEEDBACK_DAILY_SUMMARY
       ${sentWhere}
       GROUP BY summary_date
@@ -214,7 +211,7 @@ export default async function QualityPage({ searchParams }: Props) {
     <Box>
       <PageHeader
         title="Interaction Quality"
-        subtitle="Rules-based flags + AI-judged resolution and sentiment"
+        subtitle="Rules-based flags + AI-judged query resolution"
         actions={
           <>
             <AgentFilter agents={agents} />
@@ -242,9 +239,6 @@ export default async function QualityPage({ searchParams }: Props) {
                 <KpiCard label="Resolution Rate" value={`${llmKpis?.RESOLUTION_RATE ?? "—"}%`} accent="var(--mui-palette-success-main)" icon={<CheckCircleIcon fontSize="var(--icon-fontSize-lg)" />} />
               </Grid>
               <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-                <KpiCard label="Positive Experience" value={`${llmKpis?.POSITIVE_EXPERIENCE_RATE ?? "—"}%`} accent="var(--mui-palette-primary-main)" icon={<SmileyIcon fontSize="var(--icon-fontSize-lg)" />} />
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
                 <KpiCard label="Total Requests" value={daily.length > 0 ? Number(daily[0].TOTAL_REQUESTS).toLocaleString() : "—"} accent="var(--mui-palette-info-main)" />
               </Grid>
             </>
@@ -267,16 +261,16 @@ export default async function QualityPage({ searchParams }: Props) {
           {llmTrend.length > 0 ? (
             <Grid size={{ xs: 12, lg: 6 }}>
               <LineChartCard
-                title="AI Quality Scores (LLM-Judged)"
-                subheader="Was the query resolved? Was the experience positive?"
+                title="AI Quality Score (LLM-Judged)"
+                subheader="Was the query resolved? (days with no scored queries are omitted)"
                 categories={llmTrend.map((r) => toDateStr(r.SUMMARY_DATE))}
                 series={[
                   { name: "Query Resolved %", data: llmTrend.map((r) => r.RESOLUTION_RATE == null ? null : Number(r.RESOLUTION_RATE)) },
-                  { name: "Positive Experience %", data: llmTrend.map((r) => r.POSITIVE_EXPERIENCE == null ? null : Number(r.POSITIVE_EXPERIENCE)) },
                 ]}
                 format={{ suffix: "%" }}
                 yMin={0}
                 yMax={100}
+                sparse
               />
             </Grid>
           ) : null}

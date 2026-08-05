@@ -123,7 +123,9 @@ AS
             COUNT_IF(feedback_rating <= 2)                               AS negative_count,
             AVG(feedback_rating)                                         AS avg_rating,
             AVG(sentiment_score)                                         AS avg_sentiment_score,
-            ROUND(COUNT_IF(feedback_rating <= 2) * 100.0 / NULLIF(COUNT(*), 0), 2) AS negative_pct
+            ROUND(COUNT_IF(feedback_rating <= 2) * 100.0 / NULLIF(COUNT(*), 0), 2) AS negative_pct,
+            COUNT_IF(llm_query_resolved)                                 AS llm_resolved_count,
+            COUNT_IF(llm_scored_at IS NOT NULL)                          AS llm_total_scored
         FROM {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.USER_FEEDBACK
         WHERE created_at::DATE = CURRENT_DATE() - 1
         GROUP BY 1, 2, 3
@@ -139,16 +141,98 @@ AS
         tgt.avg_rating = src.avg_rating,
         tgt.avg_sentiment_score = src.avg_sentiment_score,
         tgt.negative_pct = src.negative_pct,
+        tgt.llm_resolved_count = src.llm_resolved_count,
+        tgt.llm_total_scored = src.llm_total_scored,
         tgt.computed_at = CURRENT_TIMESTAMP()
     WHEN NOT MATCHED THEN INSERT (
         summary_date, environment, agent_or_sv_name,
         total_feedback, positive_count, neutral_count, negative_count,
-        avg_rating, avg_sentiment_score, negative_pct
+        avg_rating, avg_sentiment_score, negative_pct,
+        llm_resolved_count, llm_total_scored
     ) VALUES (
         src.summary_date, src.environment, src.agent_or_sv_name,
         src.total_feedback, src.positive_count, src.neutral_count, src.negative_count,
-        src.avg_rating, src.avg_sentiment_score, src.negative_pct
+        src.avg_rating, src.avg_sentiment_score, src.negative_pct,
+        src.llm_resolved_count, src.llm_total_scored
     );
+
+-- Task: LLM feedback quality scoring (config-driven via LLM_ASSESSMENT_CONFIG)
+-- Prompt / model / sampling are read from the config row at run time, so they
+-- can be changed with a plain UPDATE (or the dashboard Settings page). Only the
+-- SCHEDULE below is DDL — the Settings API issues ALTER TASK to change it.
+--
+-- Writes a full audit row per judgment to LLM_ASSESSMENT_LOG. Two-stage design:
+--   1. Cortex COMPLETE produces a free-text EXPLANATION (kept for audit)
+--   2. AI_CLASSIFY turns that explanation into a YES/NO verdict -> boolean
+-- Stage 2 replaced substring matching (ILIKE '%YES%'), which misclassified prose
+-- answers when a stray "yes" appeared inside an explanation.
+--
+-- Judges ONE dimension: was the user's question resolved. Perceived sentiment is
+-- captured directly from users (USER_FEEDBACK.feedback_rating thumbs) rather than
+-- inferred by an LLM.
+--
+-- SNOWFLAKE.CORTEX.COMPLETE requires its model argument to be a string LITERAL,
+-- so the model is read into a variable, charset-validated, and interpolated
+-- into the INSERT via EXECUTE IMMEDIATE. Prompt/sampling stay as data.
+-- AI_CLASSIFY takes no model argument, so stage 2 is plain static SQL.
+CREATE OR REPLACE TASK {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.TASK_LLM_FEEDBACK_SCORING
+    WAREHOUSE = {{WAREHOUSE}}
+    SCHEDULE = 'USING CRON */30 * * * * UTC'
+    COMMENT = 'Score unscored feedback: COMPLETE writes an explanation, AI_CLASSIFY derives resolved YES/NO, full audit in LLM_ASSESSMENT_LOG (config in LLM_ASSESSMENT_CONFIG)'
+AS
+BEGIN
+    LET v_model STRING := (SELECT model FROM {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.LLM_ASSESSMENT_CONFIG WHERE config_id = 'default');
+    LET v_enabled BOOLEAN := (SELECT is_enabled FROM {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.LLM_ASSESSMENT_CONFIG WHERE config_id = 'default');
+    IF (v_enabled = FALSE OR v_model IS NULL) THEN
+        RETURN 'skipped: disabled or no model';
+    END IF;
+    IF (NOT RLIKE(v_model, '^[A-Za-z0-9._-]+$')) THEN
+        RETURN 'skipped: invalid model name';
+    END IF;
+
+    -- 1. Compute + log the RAW explanation for unscored feedback (one COMPLETE call).
+    EXECUTE IMMEDIATE
+        'INSERT INTO {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.LLM_ASSESSMENT_LOG
+             (feedback_id, environment, agent_or_sv_name, user_query, agent_response,
+              model, resolution_prompt, resolution_response)
+         SELECT f.feedback_id, f.environment, f.agent_or_sv_name, f.user_query, f.agent_response,
+                ''' || :v_model || ''', c.resolution_prompt,
+                SNOWFLAKE.CORTEX.COMPLETE(''' || :v_model || ''', c.resolution_prompt || '' User question: '' || COALESCE(f.user_query, '''') || '' Agent response: '' || COALESCE(f.agent_response, ''''))
+         FROM {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.USER_FEEDBACK f
+         CROSS JOIN {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.LLM_ASSESSMENT_CONFIG c
+         WHERE c.config_id = ''default'' AND c.is_enabled = TRUE
+           AND f.llm_scored_at IS NULL AND f.user_query IS NOT NULL AND f.agent_response IS NOT NULL
+           AND (c.sampling_mode = ''ALL'' OR UNIFORM(0::FLOAT, 1::FLOAT, RANDOM()) <= c.sample_rate)
+         QUALIFY c.sampling_mode = ''ALL'' OR ROW_NUMBER() OVER (ORDER BY f.created_at DESC) <= c.max_rows_per_run';
+
+    -- 2. Classify the explanation into a YES/NO verdict. AI_CLASSIFY is used
+    --    instead of substring matching because models answer in prose (a stray
+    --    "yes" inside an explanation previously flipped the verdict).
+    UPDATE {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.LLM_ASSESSMENT_LOG
+        SET resolution_verdict = AI_CLASSIFY(
+                resolution_response, ['YES','NO'],
+                {'task_description': 'The text explains whether an agent response fully answered a user question. Reply YES if the explanation concludes it WAS fully answered, otherwise NO.'}
+            ):labels[0]::STRING
+        WHERE resolution_verdict IS NULL AND resolution_response IS NOT NULL;
+
+    -- 3. Derive the boolean from the stored verdict (no extra AI calls).
+    UPDATE {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.LLM_ASSESSMENT_LOG
+        SET llm_query_resolved = (UPPER(resolution_verdict) = 'YES')
+        WHERE llm_query_resolved IS NULL AND resolution_verdict IS NOT NULL;
+
+    -- 4. Apply the latest judgment per feedback item back to USER_FEEDBACK.
+    UPDATE {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.USER_FEEDBACK f
+        SET f.llm_query_resolved = l.llm_query_resolved,
+            f.llm_scored_at = l.scored_at
+        FROM (
+            SELECT feedback_id, llm_query_resolved, scored_at,
+                   ROW_NUMBER() OVER (PARTITION BY feedback_id ORDER BY scored_at DESC) AS rn
+            FROM {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.LLM_ASSESSMENT_LOG
+            WHERE llm_query_resolved IS NOT NULL
+        ) l
+        WHERE f.feedback_id = l.feedback_id AND l.rn = 1 AND f.llm_scored_at IS NULL;
+    RETURN 'scored';
+END;
 
 -- Task: Daily interaction quality scan
 CREATE OR REPLACE TASK {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.TASK_DAILY_INTERACTION_QUALITY

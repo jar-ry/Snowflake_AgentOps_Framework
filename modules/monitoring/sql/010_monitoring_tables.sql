@@ -16,9 +16,14 @@ CREATE TABLE IF NOT EXISTS {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.USER_FEEDBACK (
     feedback_text       STRING,
     feedback_category   STRING,
     sentiment_score     FLOAT,
+    llm_query_resolved     BOOLEAN,       -- LLM: was the user's question answered? (TASK_LLM_FEEDBACK_SCORING)
+    llm_scored_at          TIMESTAMP_NTZ, -- when the LLM assessment last scored this row (NULL = unscored)
     user_name           STRING DEFAULT CURRENT_USER(),
     created_at          TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
+-- Backfill columns on pre-existing installs (no-op if already present).
+ALTER TABLE {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.USER_FEEDBACK ADD COLUMN IF NOT EXISTS llm_query_resolved     BOOLEAN;
+ALTER TABLE {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.USER_FEEDBACK ADD COLUMN IF NOT EXISTS llm_scored_at          TIMESTAMP_NTZ;
 
 CREATE TABLE IF NOT EXISTS {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.USAGE_METRICS (
     metric_id           STRING DEFAULT UUID_STRING(),
@@ -121,9 +126,14 @@ CREATE TABLE IF NOT EXISTS {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.FEEDBACK_DAILY_
     avg_rating          FLOAT,
     avg_sentiment_score FLOAT,
     negative_pct        FLOAT,
+    llm_resolved_count  INTEGER,          -- LLM-judged: # feedback rows where the query was resolved
+    llm_total_scored    INTEGER,          -- # feedback rows the LLM assessment has scored
     feedback_categories VARIANT,
     computed_at         TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
+-- Backfill columns on pre-existing installs (no-op if already present).
+ALTER TABLE {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.FEEDBACK_DAILY_SUMMARY ADD COLUMN IF NOT EXISTS llm_resolved_count INTEGER;
+ALTER TABLE {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.FEEDBACK_DAILY_SUMMARY ADD COLUMN IF NOT EXISTS llm_total_scored   INTEGER;
 
 CREATE TABLE IF NOT EXISTS {{FRAMEWORK_DB}}.{{FRAMEWORK_SCHEMA}}.INTERACTION_QUALITY_DAILY (
     summary_date            DATE,

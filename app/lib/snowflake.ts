@@ -84,6 +84,7 @@ type PollingConnection = snowflake.Connection & {
 }
 
 type ExecuteOptions = Parameters<snowflake.Connection["execute"]>[0] & { asyncExec?: boolean }
+type ExecuteBinds = NonNullable<Parameters<snowflake.Connection["execute"]>[0]["binds"]>
 
 function streamRowsToArray(statement: { streamRows: () => NodeJS.ReadableStream }): Promise<Record<string, any>[]> {
   return new Promise((resolve, reject) => {
@@ -426,6 +427,7 @@ function queryWithPool(
   pool: ReturnType<typeof snowflake.createPool>,
   query: string,
   authTag: string,
+  binds?: unknown[],
 ): Promise<Record<string, any>[]> {
   return pool.use(async (conn) => {
     const fqDb = process.env.SNOWFLAKE_DATABASE || FRAMEWORK_DB
@@ -459,6 +461,7 @@ function queryWithPool(
     return new Promise<Record<string, any>[]>((res, rej) => {
       conn.execute({
         sqlText: finalSql,
+        ...(binds && binds.length ? { binds: binds as ExecuteBinds } : {}),
         complete: (err, stmt, rows) => {
           const ms = Date.now() - t0
           const qid =
@@ -557,6 +560,8 @@ function connectAndQueryLongRunning(
 
 interface QueryOptions {
   callersRights?: boolean
+  /** Positional bind parameters for `?` placeholders (parameterized queries). */
+  binds?: unknown[]
 }
 
 /** Extra options for `querySnowflakeLongRunning` / `queryWithTokenLongRunning`. */
@@ -585,7 +590,7 @@ function resolveLongRunningOpts(
 }
 
 export async function querySnowflake(query: string, options: QueryOptions = {}): Promise<Record<string, any>[]> {
-  const { callersRights = false } = options
+  const { callersRights = false, binds } = options
   const serviceToken = getServiceToken()
 
   if (serviceToken) {
@@ -597,9 +602,9 @@ export async function querySnowflake(query: string, options: QueryOptions = {}):
         )
       }
       const combinedToken = serviceToken + "." + callerToken
-      return queryWithPool(getCallersPool(combinedToken, serviceToken), query, "spcs-caller")
+      return queryWithPool(getCallersPool(combinedToken, serviceToken), query, "spcs-caller", binds)
     }
-    return queryWithPool(getOwnersPool(serviceToken), query, "spcs-owner")
+    return queryWithPool(getOwnersPool(serviceToken), query, "spcs-owner", binds)
   }
 
   // Local dev: no SPCS token, so caller's rights is not possible.
@@ -609,13 +614,13 @@ export async function querySnowflake(query: string, options: QueryOptions = {}):
 
   // Explicit env vars: password auth via pooled connections
   if (process.env.SNOWFLAKE_USER && process.env.SNOWFLAKE_PASSWORD) {
-    return queryWithPool(getPasswordPool(), query, "password")
+    return queryWithPool(getPasswordPool(), query, "password", binds)
   }
 
   // ~/.snowflake/connections.toml or config.toml: use the default connection (local dev)
   const tomlConn = readTomlDefaultConnection()
   if (tomlConn) {
-    return queryWithPool(getTomlPool(tomlConn), query, "toml")
+    return queryWithPool(getTomlPool(tomlConn), query, "toml", binds)
   }
 
   throw new Error(

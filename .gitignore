@@ -29,5 +29,8 @@ monitoring/snowflake.yml
 # Modular installer state (which modules are installed) — instance-specific
 .agentops-installed.yaml
 
+# App Runtime descriptor generated per-instance by `snow app setup` (not committed)
+app/snowflake.yml
+
 # Local-only demo sandbox (mock-data fork of the dashboard, version backups, seed)
 demo/

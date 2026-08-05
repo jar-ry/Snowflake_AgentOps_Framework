@@ -4,6 +4,7 @@ import { SealCheckIcon } from "@phosphor-icons/react/dist/ssr/SealCheck";
 import { CurrencyDollarIcon } from "@phosphor-icons/react/dist/ssr/CurrencyDollar";
 import { WarningIcon } from "@phosphor-icons/react/dist/ssr/Warning";
 import { ChatCircleTextIcon } from "@phosphor-icons/react/dist/ssr/ChatCircleText";
+import { GearIcon } from "@phosphor-icons/react/dist/ssr/Gear";
 import type { Icon } from "@phosphor-icons/react/dist/lib/types";
 import { ENABLED_PAGES, type PageKey } from "@/lib/agentops.config";
 
@@ -24,6 +25,7 @@ const allNavItems: NavItem[] = [
   { key: "cost", title: "Cost", href: "/cost", icon: CurrencyDollarIcon },
   { key: "feedback", title: "Feedback", href: "/feedback", icon: ChatCircleTextIcon },
   { key: "alerts", title: "Alerts", href: "/alerts", icon: WarningIcon },
+  { key: "settings", title: "Settings", href: "/settings", icon: GearIcon },
 ];
 
 export const navItems: NavItem[] = allNavItems.filter((item) =>

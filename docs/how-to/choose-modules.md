@@ -97,6 +97,7 @@ The `dashboard` module ships six pages, each backed by a module:
 | Cost | `monitoring` |
 | Feedback | `monitoring` |
 | Alerts | `alerts` |
+| Settings | `monitoring` (schedule edits also need `automation`) |
 
 Expose only the pages you want by editing `ENABLED_PAGES` in
 [`app/lib/agentops.config.ts`](../../app/lib/agentops.config.ts):

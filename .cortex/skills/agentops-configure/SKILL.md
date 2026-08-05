@@ -77,6 +77,7 @@ from `modules.yaml` under `dashboard.pages`:
 - Cost (needs monitoring)
 - Feedback (needs monitoring)
 - Alerts (needs alerts)
+- Settings (needs monitoring; edits the LLM feedback assessment — prompt/model/sampling always apply, schedule needs automation)
 
 Pre-select only pages whose `requires_modules` are all in the resolved module
 set. If the customer picks a page whose required module is NOT selected (e.g.

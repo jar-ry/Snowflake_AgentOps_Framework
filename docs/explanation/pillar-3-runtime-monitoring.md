@@ -58,15 +58,36 @@ The tradeoff: rules cannot understand semantic quality of answers. They detect b
 
 ## Monitoring tables and aggregation
 
-The framework runs three daily tasks that aggregate raw observability data into queryable tables:
+The framework runs daily aggregation tasks (plus one recurring LLM scoring task) that turn raw observability and feedback data into queryable tables:
 
 | Task | Schedule | What it produces |
 |------|----------|-----------------|
 | `TASK_DAILY_USAGE_AGGREGATION` | 02:00 UTC | `USAGE_METRICS` — daily request counts, tokens, credits, latency percentiles per agent |
-| `TASK_DAILY_FEEDBACK_ANALYSIS` | 02:15 UTC | `FEEDBACK_DAILY_SUMMARY` — sentiment rollup from `USER_FEEDBACK` |
+| `TASK_DAILY_FEEDBACK_ANALYSIS` | 02:15 UTC | `FEEDBACK_DAILY_SUMMARY` — feedback rollup from `USER_FEEDBACK` (incl. LLM-judged resolution counts) |
 | `TASK_DAILY_INTERACTION_QUALITY` | 02:30 UTC | `INTERACTION_QUALITY_DAILY` — flag counts and percentages per agent per day |
+| `TASK_LLM_FEEDBACK_SCORING` | every 30 min (configurable) | writes `LLM_QUERY_RESOLVED` / `LLM_SENTIMENT_POSITIVE` onto `USER_FEEDBACK` |
 
 These tables feed the trend views and the App Runtime dashboard.
+
+### LLM feedback quality assessment (configurable)
+
+Unlike the rules-based quality engine, this is an *opt-in LLM* signal. `TASK_LLM_FEEDBACK_SCORING` judges ONE dimension per feedback row — **was the user's question resolved?** — surfaced on the Quality page as **Resolution Rate**.
+
+It runs in two stages, because models routinely ignore "reply only YES/NO" and answer in prose (substring matching on that prose misclassified them):
+
+1. **Explain** — `SNOWFLAKE.CORTEX.COMPLETE` produces a short free-text explanation, stored in `LLM_ASSESSMENT_LOG.resolution_response` for audit.
+2. **Classify** — `AI_CLASSIFY` turns that explanation into a `YES`/`NO` verdict (`resolution_verdict`), from which the boolean is derived.
+
+Every judgment is written to **`LLM_ASSESSMENT_LOG`** with the model, prompt, explanation, verdict and timestamp, so any number on the dashboard can be traced back to the model's own reasoning.
+
+Perceived sentiment is deliberately **not** LLM-inferred: it comes directly from users via `USER_FEEDBACK.feedback_rating` (thumbs up/down), which is a real signal rather than a guess — and it keeps the assessment to one AI call per row.
+
+It is **fully config-driven** by the single-row `LLM_ASSESSMENT_CONFIG` table (in the `monitoring` module):
+
+- **Prompt, model, sampling, on/off** are columns the task reads at run time — change them with a plain `UPDATE` (no DDL).
+- **Schedule** mirrors the task's `SCHEDULE`; changing it issues an `ALTER TASK`.
+
+Operators edit all of these from the dashboard **Settings** page (`/api/llm-config`), which validates input (model allow-list, strict cron, bound-parameter writes) and runs with the service (owner's) role. Because it is an LLM call per row, this task is the one monitoring path with non-trivial Cortex cost — hence the sampling controls (`ALL` vs a bounded `SAMPLE`).
 
 ## Alerts
 
@@ -121,10 +142,10 @@ When a user gives negative feedback, the dashboard tooltip recommends adding tha
 Runtime monitoring is **nearly free**:
 - All data comes from `snowflake.local.ai_observability_events` (no custom instrumentation)
 - Daily tasks run pure SQL aggregation on an XSMALL warehouse
-- No LLM calls in any monitoring path
+- The rules-based quality engine makes no LLM calls
 - Alert evaluation is a simple `EXISTS` check per alert
 
-The only non-trivial cost is the warehouse compute for the daily tasks (~seconds of XSMALL time per day).
+The main aggregation path costs only warehouse compute (~seconds of XSMALL time per day). The one exception is the **optional** `TASK_LLM_FEEDBACK_SCORING`, which makes two AI calls per scored feedback row (one `COMPLETE` for the explanation, one `AI_CLASSIFY` for the verdict) — its cost scales with feedback volume, which is why it ships with sampling controls (`ALL` vs a bounded `SAMPLE`) and an on/off switch in `LLM_ASSESSMENT_CONFIG`.
 
 ## Summary
 

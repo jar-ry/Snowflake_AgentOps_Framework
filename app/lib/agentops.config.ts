@@ -21,7 +21,7 @@ export const S = FRAMEWORK_DB && FRAMEWORK_SCHEMA ? `${FRAMEWORK_DB}.${FRAMEWORK
 //   cost     -> monitoring   feedback -> monitoring    alerts  -> alerts
 // Disabled pages are hidden from the nav and render a "module not installed"
 // notice if navigated to directly. Default: all pages enabled.
-export type PageKey = "overview" | "accuracy" | "quality" | "cost" | "feedback" | "alerts"
+export type PageKey = "overview" | "accuracy" | "quality" | "cost" | "feedback" | "alerts" | "settings"
 
 export const ENABLED_PAGES: PageKey[] = [
   "overview",
@@ -30,6 +30,7 @@ export const ENABLED_PAGES: PageKey[] = [
   "cost",
   "feedback",
   "alerts",
+  "settings",
 ]
 
 export function isPageEnabled(key: PageKey): boolean {

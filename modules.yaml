@@ -59,6 +59,8 @@ modules:
       - modules/monitoring/sql/010_monitoring_tables.sql
       - modules/monitoring/sql/020_monitoring_views.sql
       - modules/monitoring/sql/030_quality_engine.sql
+      - modules/monitoring/sql/040_llm_assessment_config.sql
+      - modules/monitoring/sql/050_llm_assessment_log.sql
     drops:
       - {type: VIEW, name: V_INTERACTION_QUALITY_DASHBOARD}
       - {type: VIEW, name: V_INTERACTION_QUALITY_FLAGS}
@@ -72,6 +74,8 @@ modules:
       - {type: VIEW, name: V_AGENT_USAGE_SOURCE}
       - {type: VIEW, name: V_TOKEN_COST_TREND}
       - {type: VIEW, name: V_FEEDBACK_TREND}
+      - {type: TABLE, name: LLM_ASSESSMENT_LOG}
+      - {type: TABLE, name: LLM_ASSESSMENT_CONFIG}
       - {type: TABLE, name: INTERACTION_QUALITY_DAILY}
       - {type: TABLE, name: FEEDBACK_DAILY_SUMMARY}
       - {type: TABLE, name: ALERT_HISTORY}
@@ -107,6 +111,7 @@ modules:
     sql:
       - modules/automation/sql/010_tasks.sql
     drops:
+      - {type: TASK, name: TASK_LLM_FEEDBACK_SCORING}
       - {type: TASK, name: TASK_DAILY_INTERACTION_QUALITY}
       - {type: TASK, name: TASK_DAILY_FEEDBACK_ANALYSIS}
       - {type: TASK, name: TASK_DAILY_USAGE_AGGREGATION}
@@ -125,5 +130,6 @@ modules:
       - {key: cost,     title: Cost,     requires_modules: [monitoring]}
       - {key: feedback, title: Feedback, requires_modules: [monitoring]}
       - {key: alerts,   title: Alerts,   requires_modules: [alerts]}
+      - {key: settings, title: Settings, requires_modules: [monitoring]}
     sql: []
     drops: []
