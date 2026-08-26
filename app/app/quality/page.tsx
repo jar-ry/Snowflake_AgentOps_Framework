@@ -18,18 +18,24 @@ import { LineChartCard, StackedBarChartCard, type LineSeries } from "../componen
 import { DataTableCard } from "../components/cards/data-table-card"
 import { FlaggedInteractionsTable, type FlaggedRow } from "../components/flagged-interactions-table"
 import { SeverityLegend } from "../components/severity-legend"
+import { LlmQualityChart } from "./llm-quality-chart"
+import { UnresolvedInteractionsTable, type UnresolvedRow } from "./unresolved-interactions-table"
+import { QualityTabs, type QualityTab } from "./quality-tabs"
 import { CheckCircleIcon } from "@phosphor-icons/react/dist/ssr/CheckCircle"
 
 export const dynamic = "force-dynamic"
 
 interface Props {
-  searchParams: Promise<{ agent?: string; window?: string; env?: string }>
+  searchParams: Promise<{ agent?: string; window?: string; env?: string; day?: string; tab?: string }>
 }
 
 export default async function QualityPage({ searchParams }: Props) {
   if (!isPageEnabled("quality")) return <ModuleNotEnabled title="Quality" module="monitoring" />
-  const { agent: agentRaw, window, env } = await searchParams
+  const { agent: agentRaw, window, env, day: dayRaw, tab: tabRaw } = await searchParams
   const agent = safeIdent(agentRaw)
+  // Only accept a strict YYYY-MM-DD drill-down date before using it in SQL.
+  const day = dayRaw && /^\d{4}-\d{2}-\d{2}$/.test(dayRaw) ? dayRaw : undefined
+  const tab: QualityTab = tabRaw === "ai" ? "ai" : "rules"
   const win = parseWindow(window)
   const envVal = pickEnv(env, await getEnvironments())
   const qConds: string[] = []
@@ -45,8 +51,13 @@ export default async function QualityPage({ searchParams }: Props) {
   let latencyData: Record<string, any>[] = []
   let llmKpis: Record<string, any> | null = null
   let llmTrend: Record<string, any>[] = []
+  let unresolved: Record<string, any>[] = []
   let agents: string[] = []
   let error: string | null = null
+
+  // Only query what the active sub-tab renders.
+  const wantRules = tab === "rules"
+  const wantAi = tab === "ai"
 
   try {
     const agentRows = await querySnowflake(`
@@ -54,7 +65,7 @@ export default async function QualityPage({ searchParams }: Props) {
     `)
     agents = agentRows.map((r: any) => r.AGENT_NAME).filter(Boolean)
 
-    flags = await querySnowflake(`
+    if (wantRules) flags = await querySnowflake(`
       SELECT
         signal_source,
         interaction_id,
@@ -71,11 +82,12 @@ export default async function QualityPage({ searchParams }: Props) {
         total_tokens
       FROM ${S}V_INTERACTION_QUALITY_FLAGS
       ${flagsAgentFilter}
+      ${flagsAgentFilter ? "AND" : "WHERE"} event_time >= DATEADD('day', -${win.days}, CURRENT_DATE())
       ORDER BY event_time DESC
       LIMIT 20
     `)
 
-    daily = await querySnowflake(`
+    if (wantRules) daily = await querySnowflake(`
       SELECT
         summary_date,
         agent_name,
@@ -86,11 +98,12 @@ export default async function QualityPage({ searchParams }: Props) {
         warning_count
       FROM ${S}V_INTERACTION_QUALITY_DASHBOARD
       ${agentFilter}
+      ${agentFilter ? "AND" : "WHERE"} summary_date >= DATEADD('day', -${win.days}, CURRENT_DATE())
       ORDER BY summary_date DESC
-      LIMIT 14
+      LIMIT 90
     `)
 
-    flaggedTrend = await querySnowflake(`
+    if (wantRules) flaggedTrend = await querySnowflake(`
       SELECT summary_date, agent_name, flagged_request_pct
       FROM ${S}V_INTERACTION_QUALITY_DASHBOARD
       ${agentFilter}
@@ -98,7 +111,7 @@ export default async function QualityPage({ searchParams }: Props) {
       ORDER BY summary_date ASC
     `)
 
-    flagBreakdown = await querySnowflake(`
+    if (wantRules) flagBreakdown = await querySnowflake(`
       SELECT
         summary_date,
         SUM(tool_looping_count)    AS looping,
@@ -117,7 +130,7 @@ export default async function QualityPage({ searchParams }: Props) {
     if (agent) latConds.push(`agent_or_sv_name = '${agent}'`)
     if (envVal) latConds.push(`environment = '${envVal}'`)
     const latFilter = `WHERE ${latConds.join(" AND ")}`
-    latencyData = await querySnowflake(`
+    if (wantRules) latencyData = await querySnowflake(`
       SELECT metric_date, AVG(avg_latency_ms) AS avg_latency, MAX(p95_latency_ms) AS p95_latency
       FROM ${S}V_TOKEN_COST_TREND
       ${latFilter}
@@ -131,7 +144,7 @@ export default async function QualityPage({ searchParams }: Props) {
     if (envVal) sentTrendConds.push(`environment = '${envVal}'`)
     const sentWhere = `WHERE ${sentTrendConds.join(" AND ")}`
 
-    llmKpis = await querySnowflake(`
+    if (wantAi) llmKpis = await querySnowflake(`
       SELECT
         ROUND(SUM(COALESCE(llm_resolved_count, 0)) * 100.0 / NULLIF(SUM(COALESCE(llm_total_scored, 0)), 0), 1) AS resolution_rate,
         COALESCE(SUM(llm_total_scored), 0) AS total_scored
@@ -139,7 +152,7 @@ export default async function QualityPage({ searchParams }: Props) {
       ${sentWhere}
     `).then(r => r[0] ?? null)
 
-    llmTrend = await querySnowflake(`
+    if (wantAi) llmTrend = await querySnowflake(`
       SELECT
         summary_date,
         ROUND(SUM(COALESCE(llm_resolved_count, 0)) * 100.0 / NULLIF(SUM(COALESCE(llm_total_scored, 0)), 0), 1) AS resolution_rate
@@ -147,6 +160,33 @@ export default async function QualityPage({ searchParams }: Props) {
       ${sentWhere}
       GROUP BY summary_date
       ORDER BY summary_date ASC
+    `)
+
+    // Drill-down: the actual interactions the LLM judged UNRESOLVED, with its own
+    // explanation. Joined to USER_FEEDBACK because the chart's x-axis is the
+    // feedback date (created_at), whereas the log's scored_at is when scoring ran.
+    const drillConds: string[] = [
+      "l.llm_query_resolved = FALSE",
+      `f.created_at::DATE >= DATEADD('day', -${win.days}, CURRENT_DATE())`,
+    ]
+    if (agent) drillConds.push(`l.agent_or_sv_name = '${agent}'`)
+    if (envVal) drillConds.push(`l.environment = '${envVal}'`)
+    if (day) drillConds.push(`f.created_at::DATE = '${day}'`)
+    if (wantAi) unresolved = await querySnowflake(`
+      SELECT
+        f.created_at::DATE      AS interaction_date,
+        l.agent_or_sv_name,
+        l.user_query,
+        l.agent_response,
+        l.resolution_verdict,
+        l.resolution_response   AS explanation,
+        l.model
+      FROM ${S}LLM_ASSESSMENT_LOG l
+      JOIN ${S}USER_FEEDBACK f ON f.feedback_id = l.feedback_id
+      WHERE ${drillConds.join(" AND ")}
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY l.feedback_id ORDER BY l.scored_at DESC) = 1
+      ORDER BY f.created_at DESC
+      LIMIT 100
     `)
   } catch (e) {
     error = friendlyError("quality", e)
@@ -190,6 +230,16 @@ export default async function QualityPage({ searchParams }: Props) {
     warning_count: Number(r.WARNING_COUNT),
   }))
 
+  const unresolvedRows: UnresolvedRow[] = unresolved.map((r) => ({
+    date: toDateStr(r.INTERACTION_DATE),
+    agent: r.AGENT_OR_SV_NAME ?? "",
+    query: r.USER_QUERY ?? "",
+    response: r.AGENT_RESPONSE ?? "",
+    verdict: r.RESOLUTION_VERDICT ?? "NO",
+    explanation: r.EXPLANATION ?? "",
+    model: r.MODEL ?? "",
+  }))
+
   const flaggedRows: FlaggedRow[] = flags.map((r) => {
     const f: { key: string; label: string }[] = []
     if (r.FLAG_TOOL_LOOPING) f.push({ key: "flag_tool_looping", label: "Loop" })
@@ -220,31 +270,28 @@ export default async function QualityPage({ searchParams }: Props) {
         }
       />
 
+      <QualityTabs value={tab} />
+
       {error ? (
         <DataTableCard title="Error" columns={[{ key: "msg", label: "Message" }]} rows={[{ msg: error }]} />
-      ) : (
+      ) : tab === "rules" ? (
         <Grid container spacing={3}>
-          {/* Top KPIs — mixed signals at a glance */}
-          {(daily.length > 0 || llmKpis) ? (
+          {daily.length > 0 ? (
             <>
               <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
                 <KpiCard
                   label="Flagged %"
-                  value={daily.length > 0 ? `${daily[0].FLAGGED_REQUEST_PCT}%` : "—"}
+                  value={`${daily[0].FLAGGED_REQUEST_PCT}%`}
                   accent="var(--mui-palette-warning-main)"
                   valueColor={Number(daily[0]?.FLAGGED_REQUEST_PCT) >= 20 ? "var(--mui-palette-error-main)" : undefined}
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-                <KpiCard label="Resolution Rate" value={`${llmKpis?.RESOLUTION_RATE ?? "—"}%`} accent="var(--mui-palette-success-main)" icon={<CheckCircleIcon fontSize="var(--icon-fontSize-lg)" />} />
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-                <KpiCard label="Total Requests" value={daily.length > 0 ? Number(daily[0].TOTAL_REQUESTS).toLocaleString() : "—"} accent="var(--mui-palette-info-main)" />
+                <KpiCard label="Total Requests" value={Number(daily[0].TOTAL_REQUESTS).toLocaleString()} accent="var(--mui-palette-info-main)" />
               </Grid>
             </>
           ) : null}
 
-          {/* Side-by-side trend charts: Rules flags (left) + AI quality (right) */}
           {flaggedData.length > 0 ? (
             <Grid size={{ xs: 12, lg: 6 }}>
               <LineChartCard
@@ -258,24 +305,6 @@ export default async function QualityPage({ searchParams }: Props) {
             </Grid>
           ) : null}
 
-          {llmTrend.length > 0 ? (
-            <Grid size={{ xs: 12, lg: 6 }}>
-              <LineChartCard
-                title="AI Quality Score (LLM-Judged)"
-                subheader="Was the query resolved? (days with no scored queries are omitted)"
-                categories={llmTrend.map((r) => toDateStr(r.SUMMARY_DATE))}
-                series={[
-                  { name: "Query Resolved %", data: llmTrend.map((r) => r.RESOLUTION_RATE == null ? null : Number(r.RESOLUTION_RATE)) },
-                ]}
-                format={{ suffix: "%" }}
-                yMin={0}
-                yMax={100}
-                sparse
-              />
-            </Grid>
-          ) : null}
-
-          {/* Flag breakdown + latency side-by-side */}
           {breakdown.length > 0 ? (
             <Grid size={{ xs: 12, lg: 6 }}>
               <StackedBarChartCard
@@ -289,7 +318,7 @@ export default async function QualityPage({ searchParams }: Props) {
           ) : null}
 
           {latency.length > 0 ? (
-            <Grid size={{ xs: 12, lg: 6 }}>
+            <Grid size={{ xs: 12 }}>
               <LineChartCard
                 title="Request Latency"
                 subheader="Average and P95 (ms)"
@@ -303,11 +332,10 @@ export default async function QualityPage({ searchParams }: Props) {
             </Grid>
           ) : null}
 
-          {/* Daily summary table */}
           <Grid size={{ xs: 12 }}>
             <DataTableCard
               title="Daily Summary"
-              subheader="Last 14 days"
+              subheader={`Last ${win.days} days`}
               pageSize={7}
               defaultSortKey="summary_date"
               defaultSortDir="desc"
@@ -325,13 +353,49 @@ export default async function QualityPage({ searchParams }: Props) {
             />
           </Grid>
 
-          {/* Flagged interactions detail */}
           <Grid size={{ xs: 12 }}>
             <FlaggedInteractionsTable title="Recent Flagged Interactions" rows={flaggedRows} pageSize={10} />
           </Grid>
 
           <Grid size={{ xs: 12 }}>
             <SeverityLegend />
+          </Grid>
+        </Grid>
+      ) : (
+        <Grid container spacing={3}>
+          {llmKpis ? (
+            <>
+              <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+                <KpiCard label="Resolution Rate" value={`${llmKpis.RESOLUTION_RATE ?? "—"}%`} accent="var(--mui-palette-success-main)" icon={<CheckCircleIcon fontSize="var(--icon-fontSize-lg)" />} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+                <KpiCard label="Interactions Judged" value={Number(llmKpis.TOTAL_SCORED ?? 0).toLocaleString()} accent="var(--mui-palette-info-main)" />
+              </Grid>
+            </>
+          ) : null}
+
+          {llmTrend.length > 0 ? (
+            <Grid size={{ xs: 12 }}>
+              <LlmQualityChart
+                categories={llmTrend.map((r) => toDateStr(r.SUMMARY_DATE))}
+                values={llmTrend.map((r) => (r.RESOLUTION_RATE == null ? null : Number(r.RESOLUTION_RATE)))}
+                day={day}
+              />
+            </Grid>
+          ) : null}
+
+          {/* LLM judge drill-down: why the resolution rate dipped */}
+          <Grid size={{ xs: 12 }}>
+            <UnresolvedInteractionsTable
+              title="LLM Judge — Unresolved Interactions"
+              subheader={
+                day
+                  ? `Queries judged NOT resolved on ${day} (${unresolvedRows.length})`
+                  : `Queries judged NOT resolved in the selected window (${unresolvedRows.length}) — click a point on the AI Quality Score chart to focus a single day`
+              }
+              rows={unresolvedRows}
+              pageSize={10}
+            />
           </Grid>
         </Grid>
       )}

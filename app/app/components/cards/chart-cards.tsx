@@ -52,9 +52,21 @@ export interface LineChartCardProps {
    * instead of an overshooting spline, and shows a marker per data point.
    */
   sparse?: boolean;
+  /**
+   * When provided, data points become clickable and this is called with the
+   * clicked point's date as `YYYY-MM-DD`. Enables drill-down (e.g. click a dip
+   * to filter a table to that day). Requires a client component to pass it.
+   */
+  onPointClick?: (isoDate: string) => void;
+  /**
+   * Changing this value remounts the chart. Needed when a click on the chart
+   * drives a soft navigation: ApexCharts' incremental update path drops the
+   * x/y axis label groups on re-render, leaving an axis-less plot.
+   */
+  redrawKey?: string;
 }
 
-export function LineChartCard({ title, subheader, action, categories, series, format, threshold, height = 320, yMin, yMax, sparse = false }: LineChartCardProps) {
+export function LineChartCard({ title, subheader, action, categories, series, format, threshold, height = 320, yMin, yMax, sparse = false, onPointClick, redrawKey }: LineChartCardProps) {
   const theme = useTheme();
   const palette = [
     theme.palette.primary.main,
@@ -78,12 +90,54 @@ export function LineChartCard({ title, subheader, action, categories, series, fo
       }))
     : series.map((s) => ({ name: s.name, data: s.data }));
 
+  // Resolve the date of a clicked point. In sparse mode points are {x: epoch, y},
+  // so the date travels with the point; otherwise fall back to the category.
+  const resolveClickedDate = (seriesIndex: number, dataPointIndex: number): string | null => {
+    if (dataPointIndex == null || dataPointIndex < 0) return null;
+    if (sparse) {
+      const point = (chartSeries as { data: { x: number; y: number | null }[] }[])[seriesIndex]?.data?.[dataPointIndex];
+      if (!point) return null;
+      const d = new Date(point.x);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+    return categories[dataPointIndex] ?? null;
+  };
+
+  const clickEvents = onPointClick
+    ? {
+        markerClick: (
+          _e: unknown,
+          _ctx: unknown,
+          { seriesIndex, dataPointIndex }: { seriesIndex: number; dataPointIndex: number },
+        ) => {
+          const iso = resolveClickedDate(seriesIndex, dataPointIndex);
+          if (iso) onPointClick(iso);
+        },
+        dataPointSelection: (
+          _e: unknown,
+          _ctx: unknown,
+          { seriesIndex, dataPointIndex }: { seriesIndex: number; dataPointIndex: number },
+        ) => {
+          const iso = resolveClickedDate(seriesIndex, dataPointIndex);
+          if (iso) onPointClick(iso);
+        },
+      }
+    : undefined;
+
   const options: ApexOptions = {
-    chart: { background: "transparent", toolbar: { show: false }, zoom: { enabled: false } },
+    chart: {
+      background: "transparent",
+      toolbar: { show: false },
+      zoom: { enabled: false },
+      ...(clickEvents ? { events: clickEvents } : {}),
+    },
     theme: { mode: "light" },
     colors: palette,
     stroke: { width: 3, curve: sparse ? "straight" : "smooth", dashArray: series.map((s) => (s.dashed ? 5 : 0)) },
-    markers: sparse ? { size: 5, strokeWidth: 0, hover: { size: 7 } } : { size: 0 },
+    markers: sparse
+      ? { size: 5, strokeWidth: 0, hover: { size: 7 } }
+      : { size: onPointClick ? 4 : 0, strokeWidth: 0, hover: { size: onPointClick ? 6 : 0 } },
     dataLabels: { enabled: false },
     legend: { show: series.length > 1, position: "top", horizontalAlign: "right" },
     grid: { borderColor: theme.palette.divider, strokeDashArray: 2 },
@@ -125,7 +179,7 @@ export function LineChartCard({ title, subheader, action, categories, series, fo
     <Card sx={{ height: "100%" }}>
       <CardHeader title={title} subheader={subheader} action={action} />
       <CardContent>
-        <Chart type="line" height={height} width="100%" options={options} series={chartSeries} />
+        <Chart key={redrawKey} type="line" height={height} width="100%" options={options} series={chartSeries} />
       </CardContent>
     </Card>
   );

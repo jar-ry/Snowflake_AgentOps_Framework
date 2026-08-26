@@ -115,6 +115,31 @@ Disabled pages are hidden from the navigation and, if opened directly, render a
 - `automation` tasks are created SUSPENDED. Resume them to start collection:
   `ALTER TASK <db>.<schema>.TASK_DAILY_USAGE_AGGREGATION RESUME;` (repeat for the
   feedback and interaction-quality tasks), or resume them in Snowsight.
+- `TASK_WEEKLY_EVALUATION` is only installed when `evaluation` is also selected,
+  because it is the writer for that module's `SCHEDULED_EVAL_RUNS` table. It runs
+  a native Cortex Analyst evaluation against the semantic view's **verified
+  queries** (not the `question_banks/` used by CI), so its accuracy is a separate
+  series on the Accuracy page rather than a continuation of the CI trend.
+  It needs two opt-ins, not one:
+
+  ```sql
+  UPDATE <db>.<schema>.EVAL_SCHEDULE_CONFIG
+     SET semantic_view = '<DB>.<SCHEMA>.<VIEW>', is_enabled = TRUE
+   WHERE config_id = 'default';
+  ALTER TASK <db>.<schema>.TASK_WEEKLY_EVALUATION RESUME;
+  ```
+
+  Run it once without scheduling it with `EXECUTE TASK <db>.<schema>.TASK_WEEKLY_EVALUATION;`.
+
+  Two requirements that are easy to miss:
+  - The task owner needs, under a **single primary role** (task execution ignores
+    secondary roles): `SNOWFLAKE.CORTEX_USER`, `USE AI FUNCTIONS`,
+    `EXECUTE TASK ON ACCOUNT`, `CREATE DATASET` on the framework schema, and
+    `SELECT` + `MONITOR` on the semantic view.
+  - The semantic view must declare `data_type` on every fact. Without it the run
+    fails with `Required field 'data_type' in Fact is missing` (392700). Plain
+    Cortex Analyst calls tolerate the omission, so a view can work fine in an
+    agent yet still fail evaluation.
 - Re-running the installer is safe — all DDL uses `CREATE ... IF NOT EXISTS` or
   `CREATE OR REPLACE`.
 - To turn a capability off, uninstall its module — never hand-edit the

@@ -145,6 +145,43 @@ semantic_view:
 
 DEV thresholds are intentionally permissive (lets developers iterate), while PROD thresholds are strict (protects production quality).
 
+## Scheduled evaluation (`TASK_WEEKLY_EVALUATION`)
+
+The two paths above are **event-triggered**: they run in CI when a PR is opened or
+merged, so a semantic view that nobody touches is never re-measured. Drift comes
+from the data and from model updates, not only from your commits, so the
+`automation` module adds an opt-in weekly evaluation that runs entirely inside
+Snowflake — no CI, no external scheduler, no secrets.
+
+It uses a different mechanism and a different ground truth from the CI paths:
+
+| | CI evaluation | Weekly task |
+|---|---|---|
+| Trigger | PR / merge | Snowflake task, weekly cron |
+| Runner | `evaluate_semantic_view.py` (Analyst REST API) | `EXECUTE_AI_EVALUATION` (SQL-callable) |
+| Ground truth | `question_banks/semantic_view/` | The view's own verified queries |
+| Metric | Result-set comparison | `sql_correctness` (LLM judge), version-pinned |
+| Writes | `SEMANTIC_VIEW_EVAL_RUNS` | `SCHEDULED_EVAL_RUNS` |
+
+Both feed `V_EVAL_ACCURACY_TREND`, so the Accuracy page and the accuracy-regression
+alert cover scheduled runs with no extra wiring. **The two accuracy numbers are not
+comparable** — different questions, different scoring — so they are kept as separate
+series via `run_type` rather than blended into one line.
+
+Because the judge is an LLM, the metric version is pinned (`v3`) in
+`EVAL_SCHEDULE_CONFIG`. An unpinned metric silently rolls forward to a new judge
+model, which would move the trend, and therefore fire the regression alert, for
+reasons that have nothing to do with the semantic view.
+
+Verified queries used as evaluation ground truth are temporarily removed from a
+copy of the view during the run, so the score measures genuine SQL generation
+rather than an exact match against the repository. This also means a view with
+only a handful of verified queries produces a coarse score — with four queries,
+one failure moves accuracy by 25 points.
+
+See `docs/how-to/choose-modules.md` for how to enable it and the privileges it
+needs.
+
 ## Cost considerations
 
 Each evaluation question costs approximately 0.29 AI Credits (with 8 GPA metrics, using `claude-opus-4-7`). See [docs/reference/cost-model.md](../reference/cost-model.md) for the full breakdown and budget planning.

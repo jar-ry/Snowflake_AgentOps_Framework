@@ -66,8 +66,9 @@ export default async function CostPage({ searchParams }: Props) {
         error_rate_pct
       FROM ${S}V_TOKEN_COST_TREND
       ${agentFilter}
+      ${agentFilter ? "AND" : "WHERE"} metric_date >= DATEADD('day', -${win.days}, CURRENT_DATE())
       ORDER BY metric_date DESC
-      LIMIT 30
+      LIMIT 200
     `)
 
     const dateConds: string[] = [`metric_date >= DATEADD('day', -${win.days}, CURRENT_DATE())`]
@@ -123,7 +124,8 @@ export default async function CostPage({ searchParams }: Props) {
       ORDER BY credits DESC NULLS LAST
     `)
 
-    // Budget burn
+    // Budget burn. Deliberately NOT window-filtered: a budget's spend-to-date
+    // is current state for its own period, not a rolling window aggregate.
     budgets = await querySnowflake(`
       SELECT budget_name, budget_period, budget_credits, spent_credits, pct_used, remaining_credits, over_threshold
       FROM ${S}V_BUDGET_BURN
@@ -319,7 +321,7 @@ export default async function CostPage({ searchParams }: Props) {
           <Grid size={{ xs: 12 }}>
             <DataTableCard
               title="Usage Detail"
-              subheader="Per-day, per-target usage (latest 30 rows)"
+              subheader={`Per-day, per-target usage (last ${win.days} days)`}
               pageSize={10}
               defaultSortKey="metric_date"
               defaultSortDir="desc"

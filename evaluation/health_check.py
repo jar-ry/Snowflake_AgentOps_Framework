@@ -4,8 +4,13 @@ Comprehensive health check for all PROD services.
 
 Runs a battery of checks and generates a report. Can be called:
   - Locally: python monitoring/health_check.py --environment prod
-  - By GitHub Actions: scheduled weekly
+  - From CI, or any external scheduler you wire up yourself
   - Results logged to the eval database's MONITORING.HEALTH_CHECK_RESULTS table
+
+NOTE: this script is not scheduled by the framework. Nothing runs it periodically
+out of the box. For scheduled, in-Snowflake evaluation of a semantic view see
+TASK_WEEKLY_EVALUATION in the automation module, which is a different measurement
+(Cortex Analyst accuracy vs verified queries, not these liveness checks).
 
 Checks:
   1. Semantic view existence and accessibility

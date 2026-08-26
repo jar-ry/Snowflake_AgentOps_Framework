@@ -86,6 +86,8 @@ export default async function Overview({ searchParams }: Props) {
       ORDER BY metric_date ASC
     `)
 
+    // Unacknowledged alerts are current open state, so this is intentionally not
+    // window-filtered -- an alert that fired earlier is still open now.
     recentAlerts = await querySnowflake(`
       SELECT alert_type, severity, target_name, message,
              DATEDIFF('hour', created_at, CURRENT_TIMESTAMP()) AS hours_ago
@@ -183,7 +185,7 @@ export default async function Overview({ searchParams }: Props) {
       <Box sx={{ mt: 3 }}>
         <DataTableCard
           title="Active Alerts"
-          subheader="Unacknowledged alerts across monitored targets"
+          subheader="Unacknowledged alerts across monitored targets (not window-scoped)"
           columns={[
             { key: "severity", label: "Severity", type: "severity", headerInfo: "CRITICAL needs immediate action; WARNING needs attention. Driven by the alert type's threshold rules." },
             { key: "alert_type", label: "Type", headerInfo: "Which monitoring rule fired (e.g. cost_anomaly, accuracy_regression, interaction_quality)." },

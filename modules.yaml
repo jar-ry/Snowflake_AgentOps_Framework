@@ -105,16 +105,24 @@ modules:
 
   automation:
     title: Automation (tasks)
-    description: Scheduled tasks that populate the monitoring tables daily (usage aggregation, feedback rollup, interaction-quality scan).
+    description: Scheduled tasks that populate the monitoring tables daily (usage aggregation, feedback rollup, interaction-quality scan), plus an opt-in weekly Cortex Analyst evaluation when the evaluation module is installed.
     depends_on: [monitoring]
     requires_warehouse: true
     sql:
       - modules/automation/sql/010_tasks.sql
+      # Writes SCHEDULED_EVAL_RUNS, so it needs the evaluation module. `requires`
+      # is both an inclusion filter and an ordering edge, so it installs only
+      # alongside `evaluation` and always after it.
+      - {path: modules/automation/sql/020_scheduled_evaluation.sql, requires: [evaluation]}
     drops:
+      - {type: TASK, name: TASK_WEEKLY_EVALUATION}
       - {type: TASK, name: TASK_LLM_FEEDBACK_SCORING}
       - {type: TASK, name: TASK_DAILY_INTERACTION_QUALITY}
       - {type: TASK, name: TASK_DAILY_FEEDBACK_ANALYSIS}
       - {type: TASK, name: TASK_DAILY_USAGE_AGGREGATION}
+      - {type: TABLE, name: EVAL_SCHEDULE_CONFIG}
+      - {type: STAGE, name: EVAL_CONFIG_STAGE}
+      - {type: FILE FORMAT, name: FF_EVAL_CONFIG_YAML}
 
   dashboard:
     title: Monitoring dashboard

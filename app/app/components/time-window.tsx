@@ -3,17 +3,18 @@
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import TextField from "@mui/material/TextField"
 import MenuItem from "@mui/material/MenuItem"
-import { WINDOW_OPTIONS } from "@/lib/window"
+import { WINDOW_OPTIONS, DEFAULT_WINDOW } from "@/lib/window"
 
 export function TimeWindow() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
-  const current = searchParams.get("window") || "30d"
+  const current = searchParams.get("window") || DEFAULT_WINDOW
 
   function onChange(value: string) {
     const params = new URLSearchParams(searchParams.toString())
-    if (value && value !== "30d") {
+    // The default needs no param, keeping shared URLs clean.
+    if (value && value !== DEFAULT_WINDOW) {
       params.set("window", value)
     } else {
       params.delete("window")

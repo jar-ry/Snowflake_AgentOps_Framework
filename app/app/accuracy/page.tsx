@@ -57,8 +57,9 @@ export default async function AccuracyPage({ searchParams }: Props) {
         accuracy_delta
       FROM ${S}V_EVAL_ACCURACY_TREND
       ${agentFilter}
+      ${agentFilter ? "AND" : "WHERE"} eval_date >= DATEADD('day', -${win.days}, CURRENT_DATE())
       ORDER BY eval_date DESC
-      LIMIT 50
+      LIMIT 500
     `)
 
     chartRows = await querySnowflake(`
@@ -153,7 +154,7 @@ export default async function AccuracyPage({ searchParams }: Props) {
           <Grid size={{ xs: 12 }}>
             <DataTableCard
               title="Evaluation Runs"
-              subheader="Latest 50 runs. Open the Resolve action on failing/regressing rows for guidance."
+              subheader={`Last ${win.days} days. Open the Resolve action on failing/regressing rows for guidance.`}
               pageSize={10}
               defaultSortKey="eval_date"
               defaultSortDir="desc"

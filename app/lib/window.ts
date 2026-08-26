@@ -15,7 +15,10 @@ export const WINDOW_OPTIONS: WindowSpec[] = [
   { key: "90d", days: 90, label: "Last 90 days" },
 ]
 
-const DEFAULT: WindowKey = "30d"
+const DEFAULT: WindowKey = "90d"
+
+/** The window used when `?window=` is absent. Exported so the selector agrees. */
+export const DEFAULT_WINDOW: WindowKey = DEFAULT
 
 /** Resolve a raw query-param value to a WindowSpec (defaults to 30d). */
 export function parseWindow(raw: string | undefined): WindowSpec {

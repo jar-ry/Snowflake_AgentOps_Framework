@@ -50,6 +50,8 @@ export default async function AlertsPage({ searchParams }: Props) {
     `)
     agents = agentRows.map((r: any) => r.TARGET_NAME).filter(Boolean)
 
+    // Active alerts are current open state, not a window aggregate: an alert that
+    // fired before the selected window is still firing, so it must stay visible.
     active = await querySnowflake(`
       SELECT
         alert_id, alert_type, severity, environment,
@@ -65,9 +67,9 @@ export default async function AlertsPage({ searchParams }: Props) {
         alert_type, severity, environment, target_name,
         message, created_at, acknowledged
       FROM ${S}ALERT_HISTORY
-      WHERE 1=1 ${agentFilterAnd}
+      WHERE created_at >= DATEADD('day', -${win.days}, CURRENT_DATE()) ${agentFilterAnd}
       ORDER BY created_at DESC
-      LIMIT 20
+      LIMIT 200
     `)
 
     history = await querySnowflake(`
@@ -132,7 +134,7 @@ export default async function AlertsPage({ searchParams }: Props) {
           <Grid size={{ xs: 12 }}>
             <DataTableCard
               title="Active Alerts"
-              subheader={active.length === 0 ? "All clear — no active alerts." : "Unacknowledged alerts. Open Resolve for step-by-step guidance."}
+              subheader={active.length === 0 ? "All clear — no active alerts." : "Unacknowledged alerts, regardless of the selected window. Open Resolve for step-by-step guidance."}
               pageSize={10}
               defaultSortKey="severity"
               defaultSortDir="asc"
@@ -165,7 +167,7 @@ export default async function AlertsPage({ searchParams }: Props) {
           <Grid size={{ xs: 12 }}>
             <DataTableCard
               title="Alert History"
-              subheader="Most recent 20 alerts"
+              subheader={`Alerts raised in the last ${win.days} days`}
               pageSize={10}
               defaultSortKey="created_at"
               defaultSortDir="desc"
